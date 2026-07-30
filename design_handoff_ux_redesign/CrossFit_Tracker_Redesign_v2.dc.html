@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; background: oklch(12% 0.01 265); }
+    a { color: oklch(72% 0.23 345); }
+    a:hover { color: oklch(80% 0.23 345); }
+  </style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 40px 16px 60px; background: oklch(12% 0.01 265); font-family: 'Helvetica Neue', Arial, sans-serif;">
+
+  <div style="text-align: center; max-width: 520px;">
+    <div style="color: oklch(97% 0.005 265); font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 22px;">CrossFit Tracker — Redesign v2</div>
+    <div style="color: oklch(62% 0.02 265); font-size: 14px; margin-top: 6px; line-height: 1.5;">Log <strong style="color: oklch(80% 0.02 265)">semplice ed essenziale</strong> (flusso unico, menu secondari per le funzioni accessorie) e Storico <strong style="color: oklch(80% 0.02 265)">approfondito</strong> (confronti, calendario, statistiche). Vedi <code style="color:oklch(70% 0.02 265)">README.md</code> per l'analisi UX completa.</div>
+  </div>
+
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402,874">
+    <div style="height: 100%; display: flex; flex-direction: column; background: oklch(12% 0.01 265);">
+
+      <div style="flex: 1; overflow: auto; padding-top: 54px;">
+
+        <!-- ============ LOG TAB ============ -->
+        <sc-if value="{{ isLog }}" hint-placeholder-val="{{ true }}">
+
+          <sc-if value="{{ isLogMain }}" hint-placeholder-val="{{ true }}">
+            <div style="padding: 4px 18px 100px; position: relative;">
+              <div style="display: flex; align-items: flex-start; justify-content: space-between;">
+                <div>
+                  <div style="color: oklch(97% 0.005 265); font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 28px; letter-spacing: -0.3px;">Log</div>
+                  <div style="color: oklch(62% 0.02 265); font-size: 14px; margin-top: 2px;">{{ dayLabel }} · {{ focusLabel }}</div>
+                </div>
+                <div onClick="{{ toggleLogMenu }}" style="width: 34px; height: 34px; border-radius: 10px; background: oklch(19% 0.015 265); border: 1px solid oklch(32% 0.02 265); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; color: oklch(85% 0.01 265); flex-shrink: 0;">⋯</div>
+              </div>
+
+              <sc-if value="{{ logMenuOpen }}" hint-placeholder-val="{{ false }}">
+                <div style="position: absolute; top: 44px; right: 18px; z-index: 20; background: oklch(23% 0.015 265); border: 1px solid oklch(32% 0.02 265); border-radius: 12px; padding: 6px; width: 210px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);">
+                  <div onClick="{{ openAllWorkouts }}" style="padding: 10px 10px; border-radius: 8px; font-size: 13.5px; color: oklch(90% 0.005 265); cursor: pointer; display:flex; align-items:center; gap:8px;" style-hover="{{ menuItemHover }}">📋 Tutti gli allenamenti</div>
+                  <div onClick="{{ openSettings }}" style="padding: 10px 10px; border-radius: 8px; font-size: 13.5px; color: oklch(90% 0.005 265); cursor: pointer; display:flex; align-items:center; gap:8px;" style-hover="{{ menuItemHover }}">⚙️ Impostazioni stepper</div>
+                </div>
+              </sc-if>
+
+              <div style="display: flex; align-items: center; gap: 8px; margin-top: 16px;">
+                <div style="display: flex; gap: 8px; overflow-x: auto; flex: 1;">
+                  <sc-for list="{{ datePills }}" as="pill" hint-placeholder-count="7">
+                    <div onClick="{{ pill.onClick }}" style="flex-shrink: 0; width: 40px; padding: 8px 0; border-radius: 12px; text-align: center; cursor: pointer; background: {{ pill.bg }};">
+                      <div style="font-size: 11px; color: oklch(55% 0.02 265); text-transform: uppercase;">{{ pill.dow }}</div>
+                      <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 15px; margin-top: 2px; color: {{ pill.color }};">{{ pill.num }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+                <div onClick="{{ toggleDateEdit }}" style="width: 34px; height: 34px; border-radius: 10px; background: oklch(19% 0.015 265); border: 1px solid oklch(32% 0.02 265); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 15px; flex-shrink: 0;">📅</div>
+              </div>
+
+              <sc-if value="{{ dateEditOpen }}" hint-placeholder-val="{{ false }}">
+                <input type="date" value="{{ dateInputValue }}" onChange="{{ onDateInputChange }}" style="margin-top: 8px; width: 100%; box-sizing: border-box; background: oklch(21% 0.015 265); border: 1px solid oklch(32% 0.02 265); border-radius: 10px; padding: 9px 10px; color: oklch(95% 0.005 265); font-size: 14px; font-family: inherit;"></input>
+              </sc-if>
+
+              <div style="margin-top: 16px; display: flex; align-items: center; gap: 10px;">
+                <div style="flex: 1; height: 8px; border-radius: 4px; background: oklch(24% 0.02 265); overflow: hidden;">
+                  <div style="height: 100%; border-radius: 4px; background: oklch(80% 0.19 152); width: {{ progressPct }};"></div>
+                </div>
+                <div style="font-size: 13px; color: oklch(70% 0.02 265); font-weight: 600; white-space: nowrap;">{{ progressLabel }}</div>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 16px;">
+                <sc-for list="{{ blocksView }}" as="block" hint-placeholder-count="4">
+                  <div style="border-radius: 16px; background: oklch(19% 0.015 265); border: 1px solid {{ block.borderColor }}; overflow: hidden;">
+                    <div onClick="{{ block.onToggle }}" style="display: flex; align-items: center; gap: 10px; padding: 14px 14px; cursor: pointer;">
+                      <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.4px; color: oklch(60% 0.02 265); background: oklch(25% 0.015 265); border-radius: 6px; padding: 4px 6px;">{{ block.typeBadge }}</div>
+                      <div style="flex: 1; min-width: 0;">
+                        <div style="color: oklch(96% 0.005 265); font-weight: 600; font-size: 15px;">{{ block.esercizio }}</div>
+                        <div style="color: oklch(58% 0.02 265); font-size: 12.5px; margin-top: 1px;">{{ block.targetLine }}</div>
+                      </div>
+                      <div style="font-size: 11.5px; font-weight: 700; padding: 5px 10px; border-radius: 999px; white-space: nowrap; background: {{ block.statusBg }}; color: {{ block.statusColor }}; border: 1px solid {{ block.statusBorder }};">{{ block.statusLabel }}</div>
+                    </div>
+
+                    <sc-if value="{{ block.showBody }}" hint-placeholder-val="{{ false }}">
+                      <div style="padding: 0 14px 16px;">
+                        <sc-if value="{{ block.isSets }}" hint-placeholder-val="{{ true }}">
+                          <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <sc-for list="{{ block.sets }}" as="set" hint-placeholder-count="3">
+                              <div style="display: flex; align-items: center; gap: 10px; background: oklch(21% 0.015 265); border-radius: 12px; padding: 8px 10px;">
+                                <div style="width: 18px; font-size: 12px; color: oklch(80% 0.19 152); font-weight: 700;">✓</div>
+                                <div style="width: 20px; font-size: 12px; color: oklch(55% 0.02 265); font-weight: 700;">{{ set.num }}</div>
+                                <div style="flex: 1; font-family: 'Space Grotesk', sans-serif; font-size: 13px; color: oklch(88% 0.005 265); text-align: right;">{{ set.kgLabel }} × {{ set.repsLabel }} <span style="color: oklch(60% 0.02 265); font-family: inherit;">@ RPE {{ set.rpeLabel }}</span></div>
+                              </div>
+                            </sc-for>
+
+                            <sc-for list="{{ block.activeSetOnly }}" as="set" hint-placeholder-count="1">
+                              <div style="background: oklch(23% 0.015 265); border-radius: 12px; padding: 10px; border: 1px solid oklch(72% 0.23 345 / 0.35);">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                  <div style="width: 20px; font-size: 12px; color: oklch(72% 0.23 345); font-weight: 700;">{{ set.num }}</div>
+                                  <div style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                    <div onClick="{{ set.onKgMinus }}" style="width: 26px; height: 26px; border-radius: 8px; background: oklch(28% 0.015 265); color: oklch(90% 0.005 265); display: flex; align-items: center; justify-content: center; font-weight: 700; cursor: pointer;">–</div>
+                                    <sc-if value="{{ set.isNotEditingKg }}" hint-placeholder-val="{{ true }}">
+                                      <div onClick="{{ set.onKgLabelClick }}" style="min-width: 46px; text-align: center; font-family: 'Space Grotesk', sans-serif; font-size: 13px; color: oklch(94% 0.005 265); cursor: text; border-bottom: 1px dotted oklch(45% 0.02 265);">{{ set.kgLabel }}</div>
+                                    </sc-if>
+                                    <sc-if value="{{ set.isEditingKg }}" hint-placeholder-val="{{ false }}">
+                                      <input type="number" step="0.5" defaultValue="{{ set.kgRaw }}" onBlur="{{ set.onKgInputBlur }}" onKeyDown="{{ set.onKgInputKeyDown }}" autoFocus="{{ true }}" style="width: 46px; text-align: center; background: oklch(30% 0.02 265); border: 1px solid oklch(60% 0.15 345); border-radius: 6px; color: oklch(96% 0.005 265); font-family: 'Space Grotesk', sans-serif; font-size: 13px; padding: 3px 0;"></input>
+                                    </sc-if>
+                                    <div onClick="{{ set.onKgPlus }}" style="width: 26px; height: 26px; border-radius: 8px; background: oklch(28% 0.015 265); color: oklch(90% 0.005 265); display: flex; align-items: center; justify-content: center; font-weight: 700; cursor: pointer;">+</div>
+                                  </div>
+                                  <div style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                    <div onClick="{{ set.onRepsMinus }}" style="width: 26px; height: 26px; border-radius: 8px; background: oklch(28% 0.015 265); color: oklch(90% 0.005 265); display: flex; align-items: center; justify-content: center; font-weight: 700; cursor: pointer;">–</div>
+                                    <div style="min-width: 42px; text-align: center; font-family: 'Space Grotesk', sans-serif; font-size: 13px; color: oklch(94% 0.005 265);">{{ set.repsLabel }}</div>
+                                    <div onClick="{{ set.onRepsPlus }}" style="width: 26px; height: 26px; border-radius: 8px; background: oklch(28% 0.015 265); color: oklch(90% 0.005 265); display: flex; align-items: center; justify-content: center; font-weight: 700; cursor: pointer;">+</div>
+                                  </div>
+                                  <div style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                    <div onClick="{{ set.onRpeMinus }}" style="width: 26px; height: 26px; border-radius: 8px; background: oklch(28% 0.015 265); color: oklch(90% 0.005 265); display: flex; align-items: center; justify-content: center; font-weight: 700; cursor: pointer;">–</div>
+                                    <div style="min-width: 42px; text-align: center; font-family: 'Space Grotesk', sans-serif; font-size: 13px; color: oklch(94% 0.005 265);">{{ set.rpeLabel }}</div>
+                                    <div onClick="{{ set.onRpePlus }}" style="width: 26px; height: 26px; border-radius: 8px; background: oklch(28% 0.015 265); color: oklch(90% 0.005 265); display: flex; align-items: center; justify-content: center; font-weight: 700; cursor: pointer;">+</div>
+                                  </div>
+                                </div>
+                                <div onClick="{{ set.onConfirm }}" style="margin-top: 8px; text-align: center; padding: 8px 0; border-radius: 9px; background: oklch(72% 0.23 345); color: oklch(12% 0.01 265); font-size: 13px; font-weight: 700; cursor: pointer;">✓ Conferma set {{ set.num }}</div>
+                              </div>
+                            </sc-for>
+
+                            <sc-if value="{{ block.allSetsConfirmed }}" hint-placeholder-val="{{ false }}">
+                              <div style="display: flex; gap: 8px; margin-top: 4px;">
+                                <div onClick="{{ block.onAddSet }}" style="flex: 1; text-align: center; padding: 9px 0; border-radius: 10px; border: 1px dashed oklch(40% 0.02 265); color: oklch(70% 0.02 265); font-size: 13px; font-weight: 600; cursor: pointer;">+ Set</div>
+                                <div onClick="{{ block.onMarkDone }}" style="flex: 1.6; text-align: center; padding: 9px 0; border-radius: 10px; background: {{ block.doneBtnBg }}; color: {{ block.doneBtnColor }}; font-size: 13px; font-weight: 700; cursor: pointer;">{{ block.doneBtnLabel }}</div>
+                              </div>
+                            </sc-if>
+                          </div>
+                        </sc-if>
+
+                        <sc-if value="{{ block.isWod }}" hint-placeholder-val="{{ false }}">
+                          <div>
+                            <div style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px;">
+                              <sc-for list="{{ block.wodFormats }}" as="fmt" hint-placeholder-count="6">
+                                <div onClick="{{ fmt.onClick }}" style="flex-shrink: 0; padding: 7px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600; cursor: pointer; background: {{ fmt.bg }}; color: {{ fmt.color }};">{{ fmt.label }}</div>
+                              </sc-for>
+                            </div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
+                              <sc-if value="{{ block.wod.showTempo }}" hint-placeholder-val="{{ false }}">
+                                <div style="flex: 1; min-width: 130px; background: oklch(23% 0.015 265); border-radius: 12px; padding: 10px; text-align: center;">
+                                  <div style="font-size: 11px; color: oklch(55% 0.02 265); margin-bottom: 6px;">Tempo</div>
+                                  <div style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                    <div onClick="{{ block.wod.onMinMinus }}" style="width: 24px; height: 24px; border-radius: 7px; background: oklch(28% 0.015 265); display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: 700;">–</div>
+                                    <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; color: oklch(95% 0.005 265); min-width: 60px;">{{ block.wod.tempoLabel }}</div>
+                                    <div onClick="{{ block.wod.onMinPlus }}" style="width: 24px; height: 24px; border-radius: 7px; background: oklch(28% 0.015 265); display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: 700;">+</div>
+                                  </div>
+                                </div>
+                              </sc-if>
+                              <sc-if value="{{ block.wod.showRound }}" hint-placeholder-val="{{ false }}">
+                                <div style="flex: 1; min-width: 110px; background: oklch(23% 0.015 265); border-radius: 12px; padding: 10px; text-align: center;">
+                                  <div style="font-size: 11px; color: oklch(55% 0.02 265); margin-bottom: 6px;">Round</div>
+                                  <div style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                    <div onClick="{{ block.wod.onRoundMinus }}" style="width: 24px; height: 24px; border-radius: 7px; background: oklch(28% 0.015 265); display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: 700;">–</div>
+                                    <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; color: oklch(95% 0.005 265); min-width: 30px;">{{ block.wod.roundLabel }}</div>
+                                    <div onClick="{{ block.wod.onRoundPlus }}" style="width: 24px; height: 24px; border-radius: 7px; background: oklch(28% 0.015 265); display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: 700;">+</div>
+                                  </div>
+                                </div>
+                              </sc-if>
+                              <sc-if value="{{ block.wod.showRepsTotali }}" hint-placeholder-val="{{ false }}">
+                                <div style="flex: 1; min-width: 110px; background: oklch(23% 0.015 265); border-radius: 12px; padding: 10px; text-align: center;">
+                                  <div style="font-size: 11px; color: oklch(55% 0.02 265); margin-bottom: 6px;">Reps tot.</div>
+                                  <div style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                    <div onClick="{{ block.wod.onRepsMinus }}" style="width: 24px; height: 24px; border-radius: 7px; background: oklch(28% 0.015 265); display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: 700;">–</div>
+                                    <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; color: oklch(95% 0.005 265); min-width: 30px;">{{ block.wod.repsTotaliLabel }}</div>
+                                    <div onClick="{{ block.wod.onRepsPlus }}" style="width: 24px; height: 24px; border-radius: 7px; background: oklch(28% 0.015 265); display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: 700;">+</div>
+                                  </div>
+                                </div>
+                              </sc-if>
+                              <sc-if value="{{ block.wod.showRepsExtra }}" hint-placeholder-val="{{ false }}">
+                                <div style="flex: 1; min-width: 130px; background: oklch(23% 0.015 265); border-radius: 12px; padding: 10px; text-align: center;">
+                                  <div style="font-size: 11px; color: oklch(55% 0.02 265); margin-bottom: 6px;">Rep extra (round incompleto)</div>
+                                  <div style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                    <div onClick="{{ block.wod.onRepsExtraMinus }}" style="width: 24px; height: 24px; border-radius: 7px; background: oklch(28% 0.015 265); display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: 700;">–</div>
+                                    <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; color: oklch(95% 0.005 265); min-width: 30px;">{{ block.wod.repsExtraLabel }}</div>
+                                    <div onClick="{{ block.wod.onRepsExtraPlus }}" style="width: 24px; height: 24px; border-radius: 7px; background: oklch(28% 0.015 265); display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: 700;">+</div>
+                                  </div>
+                                </div>
+                              </sc-if>
+                            </div>
+
+                            <sc-if value="{{ block.wod.showSplits }}" hint-placeholder-val="{{ false }}">
+                              <div style="margin-top: 12px;">
+                                <div style="font-size: 11px; color: oklch(55% 0.02 265); margin-bottom: 6px;">Split / parziali per esercizio</div>
+                                <div style="display: flex; flex-direction: column; gap: 6px;">
+                                  <sc-for list="{{ block.wod.splits }}" as="sp" hint-placeholder-count="6">
+                                    <div style="display: flex; align-items: center; gap: 6px; background: oklch(23% 0.015 265); border-radius: 10px; padding: 6px 8px;">
+                                      <input type="text" value="{{ sp.label }}" onChange="{{ sp.onLabelChange }}" placeholder="es. Thrusters 21" style="flex: 1; min-width: 0; background: transparent; border: none; color: oklch(90% 0.005 265); font-size: 12.5px; padding: 4px 2px;"></input>
+                                      <div onClick="{{ sp.onMinMinus }}" style="width: 22px; height: 22px; border-radius: 6px; background: oklch(28% 0.015 265); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px; font-weight: 700; flex-shrink: 0;">–</div>
+                                      <div style="font-family: 'Space Grotesk', sans-serif; font-size: 12.5px; color: oklch(95% 0.005 265); min-width: 44px; text-align: center; flex-shrink: 0;">{{ sp.mmss }}</div>
+                                      <div onClick="{{ sp.onMinPlus }}" style="width: 22px; height: 22px; border-radius: 6px; background: oklch(28% 0.015 265); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px; font-weight: 700; flex-shrink: 0;">+</div>
+                                    </div>
+                                  </sc-for>
+                                </div>
+                                <div onClick="{{ block.wod.onAddSplit }}" style="margin-top: 6px; text-align: center; padding: 7px 0; border-radius: 8px; border: 1px dashed oklch(40% 0.02 265); color: oklch(70% 0.02 265); font-size: 12.5px; font-weight: 600; cursor: pointer;">+ Aggiungi parziale</div>
+                              </div>
+                            </sc-if>
+
+                            <div onClick="{{ block.onMarkDone }}" style="margin-top: 10px; text-align: center; padding: 9px 0; border-radius: 10px; background: {{ block.doneBtnBg }}; color: {{ block.doneBtnColor }}; font-size: 13px; font-weight: 700; cursor: pointer;">{{ block.doneBtnLabel }}</div>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-for>
+
+                <div style="border-radius: 16px; background: oklch(19% 0.015 265); border: 1px dashed oklch(38% 0.02 265); overflow: hidden;">
+                  <div onClick="{{ libero.onToggle }}" style="display: flex; align-items: center; gap: 10px; padding: 14px 14px; cursor: pointer;">
+                    <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.4px; color: oklch(60% 0.02 265); background: oklch(25% 0.015 265); border-radius: 6px; padding: 4px 6px;">LIBERO</div>
+                    <div style="flex: 1; color: oklch(80% 0.01 265); font-weight: 600; font-size: 14px;">+ Aggiungi voce senza piano</div>
+                  </div>
+                  <sc-if value="{{ libero.showBody }}" hint-placeholder-val="{{ false }}">
+                    <div style="padding: 0 14px 16px; color: oklch(58% 0.02 265); font-size: 12.5px;">Scegli tipo ed esercizio, poi compila i set come sopra — stessa card, in coda alla lista invece che in una sezione separata.</div>
+                  </sc-if>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isLogAll }}" hint-placeholder-val="{{ false }}">
+            <div style="padding: 4px 18px 30px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div onClick="{{ closeSubscreen }}" style="cursor: pointer; font-size: 20px; color: oklch(85% 0.01 265);">←</div>
+                <div style="color: oklch(97% 0.005 265); font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 20px;">Tutti gli allenamenti</div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 16px;">
+                <sc-for list="{{ programDays }}" as="d" hint-placeholder-count="5">
+                  <div onClick="{{ d.onClick }}" style="background: {{ d.bg }}; border: 1px solid {{ d.border }}; border-radius: 12px; padding: 12px 14px; cursor: pointer;">
+                    <div style="color: oklch(60% 0.02 265); font-size: 11.5px;">Settimana {{ d.settimana }}</div>
+                    <div style="color: oklch(92% 0.005 265); font-weight: 600; font-size: 14px; margin-top: 2px;">{{ d.giorno }} <span style="font-weight: 400; color: oklch(58% 0.02 265);">— {{ d.focus }}</span></div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isLogSettings }}" hint-placeholder-val="{{ false }}">
+            <div style="padding: 4px 18px 30px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div onClick="{{ closeSubscreen }}" style="cursor: pointer; font-size: 20px; color: oklch(85% 0.01 265);">←</div>
+                <div style="color: oklch(97% 0.005 265); font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 20px;">Impostazioni stepper</div>
+              </div>
+              <div style="margin-top: 18px;">
+                <div style="color: oklch(60% 0.02 265); font-size: 12.5px; margin-bottom: 6px;">Step carico (kg)</div>
+                <div style="display: flex; gap: 6px;">
+                  <sc-for list="{{ kgStepOptions }}" as="opt" hint-placeholder-count="4">
+                    <div onClick="{{ opt.onClick }}" style="flex: 1; text-align: center; padding: 9px 0; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; background: {{ opt.bg }}; color: {{ opt.color }};">{{ opt.label }}</div>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="margin-top: 18px;">
+                <div style="color: oklch(60% 0.02 265); font-size: 12.5px; margin-bottom: 6px;">Step reps</div>
+                <div style="display: flex; gap: 6px;">
+                  <sc-for list="{{ repsStepOptions }}" as="opt" hint-placeholder-count="3">
+                    <div onClick="{{ opt.onClick }}" style="flex: 1; text-align: center; padding: 9px 0; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; background: {{ opt.bg }}; color: {{ opt.color }};">{{ opt.label }}</div>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+        </sc-if>
+
+        <!-- ============ STORICO TAB ============ -->
+        <sc-if value="{{ isStorico }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 4px 18px 30px; position: relative;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div style="color: oklch(97% 0.005 265); font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 28px;">Storico</div>
+              <div onClick="{{ toggleFilter }}" style="width: 34px; height: 34px; border-radius: 10px; background: {{ filterBtnBg }}; border: 1px solid oklch(32% 0.02 265); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 15px; flex-shrink: 0;">⚗</div>
+            </div>
+
+            <sc-if value="{{ filterOpen }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top: 10px; background: oklch(19% 0.015 265); border: 1px solid oklch(32% 0.02 265); border-radius: 14px; padding: 12px;">
+                <div style="color: oklch(58% 0.02 265); font-size: 11px; margin-bottom: 6px;">Periodo</div>
+                <div style="display: flex; gap: 6px;">
+                  <sc-for list="{{ rangeOptions }}" as="opt" hint-placeholder-count="4">
+                    <div onClick="{{ opt.onClick }}" style="flex: 1; text-align: center; padding: 7px 0; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; background: {{ opt.bg }}; color: {{ opt.color }};">{{ opt.label }}</div>
+                  </sc-for>
+                </div>
+                <div style="color: oklch(58% 0.02 265); font-size: 11px; margin: 10px 0 6px;">Tipo blocco</div>
+                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                  <sc-for list="{{ tipoOptions }}" as="opt" hint-placeholder-count="5">
+                    <div onClick="{{ opt.onClick }}" style="padding: 7px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; background: {{ opt.bg }}; color: {{ opt.color }};">{{ opt.label }}</div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <div style="display: flex; gap: 6px; margin-top: 14px; overflow-x: auto; padding-bottom: 4px;">
+              <sc-for list="{{ storicoTabs }}" as="t" hint-placeholder-count="6">
+                <div onClick="{{ t.onClick }}" style="flex-shrink: 0; text-align: center; padding: 8px 12px; border-radius: 9px; font-size: 12.5px; font-weight: 600; cursor: pointer; background: {{ t.bg }}; color: {{ t.color }};">{{ t.label }}</div>
+              </sc-for>
+            </div>
+
+            <!-- 1RM -->
+            <sc-if value="{{ isStorico1rm }}" hint-placeholder-val="{{ true }}">
+              <div style="color: oklch(55% 0.02 265); font-size: 11.5px; margin-top: 14px;">Tocca per aggiungere/togliere dal confronto</div>
+              <div style="display: flex; gap: 6px; margin-top: 6px; overflow-x: auto; padding-bottom: 6px;">
+                <sc-for list="{{ exercises }}" as="ex" hint-placeholder-count="4">
+                  <div onClick="{{ ex.onClick }}" style="flex-shrink: 0; padding: 8px 13px; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; background: {{ ex.bg }}; color: {{ ex.color }}; border: 1px solid {{ ex.border }};">{{ ex.dot }} {{ ex.name }}</div>
+                </sc-for>
+              </div>
+
+              <div style="margin-top: 10px; background: oklch(19% 0.015 265); border-radius: 16px; padding: 16px;">
+                <div style="color: oklch(60% 0.02 265); font-size: 12.5px;">Miglior 1RM stimato — {{ topExercise }}</div>
+                <div style="display: flex; align-items: baseline; gap: 8px; margin-top: 4px;">
+                  <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 32px; color: oklch(97% 0.005 265);">{{ bestValueLabel }}</div>
+                  <div style="font-size: 13px; font-weight: 700; color: oklch(80% 0.19 152);">{{ deltaLabel }}</div>
+                </div>
+                <svg width="100%" height="130" viewBox="0 0 280 130" style="margin-top: 12px; overflow: visible;">
+                  <sc-for list="{{ multiLines }}" as="ln" hint-placeholder-count="2">
+                    <polyline points="{{ ln.points }}" fill="none" stroke="{{ ln.color }}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                  </sc-for>
+                  <sc-for list="{{ trendDots }}" as="dot" hint-placeholder-count="6">
+                    <circle cx="{{ dot.cx }}" cy="{{ dot.cy }}" r="3.5" fill="{{ dot.fill }}"></circle>
+                  </sc-for>
+                </svg>
+                <div style="display: flex; justify-content: space-between; margin-top: 6px;">
+                  <sc-for list="{{ trendLabels }}" as="lbl" hint-placeholder-count="6">
+                    <div style="font-size: 10px; color: oklch(48% 0.02 265);">{{ lbl.text }}</div>
+                  </sc-for>
+                </div>
+                <div style="display: flex; gap: 12px; margin-top: 10px; flex-wrap: wrap;">
+                  <sc-for list="{{ legend }}" as="lg" hint-placeholder-count="2">
+                    <div style="display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: oklch(72% 0.01 265);"><div style="width: 8px; height: 8px; border-radius: 999px; background: {{ lg.color }};"></div>{{ lg.name }}</div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- WOD -->
+            <sc-if value="{{ isStoricoWod }}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; gap: 6px; margin-top: 16px; overflow-x: auto; padding-bottom: 6px;">
+                <sc-for list="{{ wodChoices }}" as="w" hint-placeholder-count="2">
+                  <div onClick="{{ w.onClick }}" style="flex-shrink: 0; padding: 8px 13px; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; background: {{ w.bg }}; color: {{ w.color }};">{{ w.name }}</div>
+                </sc-for>
+              </div>
+              <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 8px;">
+                <sc-for list="{{ wodEntries }}" as="e" hint-placeholder-count="3">
+                  <div style="display: flex; align-items: center; justify-content: space-between; background: oklch(19% 0.015 265); border-radius: 12px; padding: 12px 14px; border: 1px solid {{ e.borderColor }};">
+                    <div style="color: oklch(60% 0.02 265); font-size: 13px;">{{ e.date }}</div>
+                    <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 16px; color: {{ e.valueColor }};">{{ e.value }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <!-- VOLUME -->
+            <sc-if value="{{ isStoricoVolume }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top: 16px; background: oklch(19% 0.015 265); border-radius: 16px; padding: 16px;">
+                <div style="color: oklch(60% 0.02 265); font-size: 12.5px; margin-bottom: 10px;">Volume settimanale (kg totali)</div>
+                <div style="display: flex; align-items: flex-end; gap: 10px; height: 110px;">
+                  <sc-for list="{{ volumeWeekly }}" as="bar" hint-placeholder-count="4">
+                    <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end;">
+                      <div style="width: 100%; border-radius: 6px 6px 0 0; background: oklch(78% 0.19 152); height: {{ bar.pct }};"></div>
+                      <div style="font-size: 10px; color: oklch(48% 0.02 265);">{{ bar.label }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="margin-top: 12px; background: oklch(19% 0.015 265); border-radius: 16px; padding: 16px;">
+                <div style="color: oklch(60% 0.02 265); font-size: 12.5px; margin-bottom: 10px;">Volume mensile (kg totali)</div>
+                <div style="display: flex; align-items: flex-end; gap: 10px; height: 110px;">
+                  <sc-for list="{{ volumeMonthly }}" as="bar" hint-placeholder-count="3">
+                    <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end;">
+                      <div style="width: 100%; border-radius: 6px 6px 0 0; background: oklch(72% 0.23 345); height: {{ bar.pct }};"></div>
+                      <div style="font-size: 10px; color: oklch(48% 0.02 265);">{{ bar.label }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- CONFRONTO -->
+            <sc-if value="{{ isStoricoConfronto }}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; gap: 8px; margin-top: 16px;">
+                <div style="flex: 1;">
+                  <div style="color: oklch(58% 0.02 265); font-size: 11px; margin-bottom: 6px;">Periodo A</div>
+                  <select onChange="{{ onCompareAChange }}" value="{{ compareA }}" style="width: 100%; background: oklch(23% 0.015 265); border: 1px solid oklch(32% 0.02 265); border-radius: 10px; padding: 9px; color: oklch(90% 0.02 152); font-weight: 600; font-size: 13px;">
+                    <sc-for list="{{ periodOptions }}" as="p" hint-placeholder-count="4">
+                      <option value="{{ p.value }}">{{ p.label }}</option>
+                    </sc-for>
+                  </select>
+                </div>
+                <div style="flex: 1;">
+                  <div style="color: oklch(58% 0.02 265); font-size: 11px; margin-bottom: 6px;">Periodo B</div>
+                  <select onChange="{{ onCompareBChange }}" value="{{ compareB }}" style="width: 100%; background: oklch(23% 0.015 265); border: 1px solid oklch(32% 0.02 265); border-radius: 10px; padding: 9px; color: oklch(90% 0.23 345); font-weight: 600; font-size: 13px;">
+                    <sc-for list="{{ periodOptions }}" as="p" hint-placeholder-count="4">
+                      <option value="{{ p.value }}">{{ p.label }}</option>
+                    </sc-for>
+                  </select>
+                </div>
+              </div>
+
+              <div style="margin-top: 14px; background: oklch(19% 0.015 265); border-radius: 16px; padding: 6px 16px;">
+                <sc-for list="{{ compareRows }}" as="row" hint-placeholder-count="5">
+                  <div style="display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid oklch(26% 0.015 265);">
+                    <div style="flex: 1.3; color: oklch(75% 0.01 265); font-size: 12.5px;">{{ row.label }}</div>
+                    <div style="flex: 1; text-align: right; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 14px; color: oklch(80% 0.19 152);">{{ row.a }}</div>
+                    <div style="flex: 1; text-align: right; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 14px; color: oklch(72% 0.23 345);">{{ row.b }}</div>
+                    <div style="flex: 0.9; text-align: right; font-size: 11.5px; font-weight: 700; color: {{ row.deltaColor }};">{{ row.delta }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <!-- CALENDARIO -->
+            <sc-if value="{{ isStoricoCalendario }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top: 16px; background: oklch(19% 0.015 265); border-radius: 16px; padding: 16px;">
+                <div style="color: oklch(60% 0.02 265); font-size: 12.5px; margin-bottom: 10px;">{{ calMonthLabel }} — frequenza e volume</div>
+                <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px;">
+                  <sc-for list="{{ calDowLabels }}" as="d" hint-placeholder-count="7">
+                    <div style="text-align: center; font-size: 10px; color: oklch(48% 0.02 265);">{{ d.text }}</div>
+                  </sc-for>
+                  <sc-for list="{{ calCells }}" as="cell" hint-placeholder-count="35">
+                    <div onClick="{{ cell.onClick }}" style="aspect-ratio: 1; border-radius: 6px; background: {{ cell.bg }}; border: 1px solid {{ cell.border }}; display: flex; align-items: center; justify-content: center; font-size: 10.5px; color: {{ cell.color }}; cursor: pointer;">{{ cell.day }}</div>
+                  </sc-for>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 10.5px; color: oklch(50% 0.02 265);">
+                  meno
+                  <div style="width: 12px; height: 12px; border-radius: 3px; background: oklch(80% 0.19 152 / 0.12);"></div>
+                  <div style="width: 12px; height: 12px; border-radius: 3px; background: oklch(80% 0.19 152 / 0.4);"></div>
+                  <div style="width: 12px; height: 12px; border-radius: 3px; background: oklch(80% 0.19 152 / 0.8);"></div>
+                  più
+                </div>
+              </div>
+              <sc-if value="{{ calSelected }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top: 10px; background: oklch(23% 0.015 265); border-radius: 12px; padding: 12px 14px;">
+                  <div style="color: oklch(90% 0.005 265); font-weight: 600; font-size: 13.5px;">{{ calSelected.dateLabel }}</div>
+                  <div style="color: oklch(60% 0.02 265); font-size: 12px; margin-top: 3px;">{{ calSelected.detail }}</div>
+                </div>
+              </sc-if>
+            </sc-if>
+
+            <!-- STATISTICHE -->
+            <sc-if value="{{ isStoricoStatistiche }}" hint-placeholder-val="{{ false }}">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px;">
+                <sc-for list="{{ statCards }}" as="st" hint-placeholder-count="4">
+                  <div style="background: oklch(19% 0.015 265); border-radius: 14px; padding: 14px; border: 1px solid oklch(30% 0.02 265);">
+                    <div style="font-size: 20px;">{{ st.icon }}</div>
+                    <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 22px; color: oklch(96% 0.005 265); margin-top: 6px;">{{ st.value }}</div>
+                    <div style="font-size: 11px; color: oklch(58% 0.02 265); margin-top: 2px;">{{ st.label }}</div>
+                  </div>
+                </sc-for>
+              </div>
+
+              <div style="margin-top: 12px; background: oklch(19% 0.015 265); border-radius: 16px; padding: 16px;">
+                <div style="color: oklch(60% 0.02 265); font-size: 12.5px; margin-bottom: 10px;">Distribuzione RPE (ultimi 30gg)</div>
+                <div style="display: flex; align-items: flex-end; gap: 5px; height: 90px;">
+                  <sc-for list="{{ rpeHisto }}" as="bar" hint-placeholder-count="10">
+                    <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end;">
+                      <div style="width: 100%; border-radius: 4px 4px 0 0; background: {{ bar.color }}; height: {{ bar.pct }};"></div>
+                      <div style="font-size: 9px; color: oklch(48% 0.02 265);">{{ bar.label }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+          </div>
+        </sc-if>
+
+      </div>
+
+      <div style="display: flex; border-top: 1px solid oklch(24% 0.015 265); padding: 10px 10px calc(env(safe-area-inset-bottom, 0px) + 10px); background: oklch(14% 0.012 265);">
+        <div onClick="{{ setTabLog }}" style="flex: 1; text-align: center; padding: 6px 0; cursor: pointer;">
+          <div style="width: 22px; height: 3px; border-radius: 2px; margin: 0 auto 6px; background: {{ tabLogIndicator }};"></div>
+          <div style="font-size: 11.5px; font-weight: 600; color: {{ tabLogColor }};">Log</div>
+        </div>
+        <div onClick="{{ setTabStorico }}" style="flex: 1; text-align: center; padding: 6px 0; cursor: pointer;">
+          <div style="width: 22px; height: 3px; border-radius: 2px; margin: 0 auto 6px; background: {{ tabStoricoIndicator }};"></div>
+          <div style="font-size: 11.5px; font-weight: 600; color: {{ tabStoricoColor }};">Storico</div>
+        </div>
+      </div>
+
+    </div>
+  </x-import>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const WOD_FORMATS = ['AMRAP', 'EMOM', 'For Time', 'Round liberi', 'Volume Accumulation', 'Libero'];
+const CAMPI = {
+  'AMRAP': { round: true, repsExtra: true },
+  'EMOM': { round: true, repsTotali: true },
+  'For Time': { tempo: true, splits: true },
+  'Round liberi': { round: true },
+  'Volume Accumulation': { repsTotali: true },
+  'Libero': { tempo: true, round: true, repsTotali: true },
+};
+const GREEN = 'oklch(80% 0.19 152)';
+const MAGENTA = 'oklch(72% 0.23 345)';
+const BLUE = 'oklch(72% 0.15 250)';
+const AMBER = 'oklch(78% 0.15 80)';
+const SURFACE_HOVER = 'oklch(25% 0.015 265)';
+
+class Component extends DCLogic {
+  state = {
+    tab: 'log',
+    logScreen: 'main',
+    logMenuOpen: false,
+    dateEditOpen: false,
+    dateSel: 3,
+    activeBlock: 2, // primo blocco non fatto aperto di default (merge Blocchi+Wizard)
+    editingKg: null,
+    kgStep: 2.5,
+    repsStep: 1,
+    blocks: [
+      { id: 1, tipo: 'strength', esercizio: 'Back Squat', target: '5×5 @ 80kg · RPE 8', done: true,
+        sets: [{ kg: 80, reps: 5, rpe: 8, confirmed: true }, { kg: 80, reps: 5, rpe: 8, confirmed: true }, { kg: 82.5, reps: 5, rpe: 8.5, confirmed: true }, { kg: 82.5, reps: 5, rpe: 8.5, confirmed: true }, { kg: 82.5, reps: 4, rpe: 9, confirmed: true }] },
+      { id: 2, tipo: 'complex', esercizio: 'Clean + Front Squat + Jerk', target: '(1+1+1)×5 @ 60kg', done: false,
+        sets: [
+          { kg: 60, reps: 1, rpe: null, confirmed: false }, { kg: null, reps: null, rpe: null, confirmed: false },
+          { kg: null, reps: null, rpe: null, confirmed: false }, { kg: null, reps: null, rpe: null, confirmed: false },
+          { kg: null, reps: null, rpe: null, confirmed: false },
+        ] },
+      { id: 3, tipo: 'wod', esercizio: 'Fran — Thrusters 42.5kg / Pull-up', target: '21-15-9', done: false,
+        wod: { formato: 'For Time', tempoMin: 0, tempoSec: 0, round: 0, repsTotali: 0, repsExtra: 0,
+          splits: [
+            { label: 'Thrusters 21', min: 0, sec: 0 }, { label: 'Pull-up 21', min: 0, sec: 0 },
+            { label: 'Thrusters 15', min: 0, sec: 0 }, { label: 'Pull-up 15', min: 0, sec: 0 },
+            { label: 'Thrusters 9', min: 0, sec: 0 }, { label: 'Pull-up 9', min: 0, sec: 0 },
+          ] } },
+      { id: 4, tipo: 'accessorio', esercizio: 'Plank Hold', target: '3×45s', done: true,
+        sets: [{ kg: null, reps: 45, rpe: null, confirmed: true }, { kg: null, reps: 45, rpe: null, confirmed: true }, { kg: null, reps: 40, rpe: null, confirmed: true }] },
+    ],
+
+    storicoTab: '1rm',
+    filterOpen: false,
+    dateRange: '90g',
+    tipoFilter: 'Tutti',
+    selectedExercises: ['Back Squat'],
+    selectedWod: 'Fran',
+    compareA: 'Sett. 27', compareB: 'Sett. 30',
+    calSelectedDay: 14,
+  };
+
+  toggleLogMenu() { this.setState(s => ({ logMenuOpen: !s.logMenuOpen })); }
+  openAllWorkouts() { this.setState({ logScreen: 'all', logMenuOpen: false }); }
+  openSettings() { this.setState({ logScreen: 'settings', logMenuOpen: false }); }
+  closeSubscreen() { this.setState({ logScreen: 'main' }); }
+  toggleDateEdit() { this.setState(s => ({ dateEditOpen: !s.dateEditOpen })); }
+
+  updateSet(blockId, idx, field, delta) {
+    this.setState(s => ({
+      blocks: s.blocks.map(b => b.id !== blockId ? b : {
+        ...b,
+        sets: b.sets.map((set, i) => i !== idx ? set : { ...set, [field]: Math.max(0, (set[field] || 0) + delta) }),
+      }),
+    }));
+  }
+  startEditKg(key) { this.setState({ editingKg: key }); }
+  commitKg(blockId, idx, raw) {
+    const v = parseFloat(String(raw).replace(',', '.'));
+    this.setState(s => ({
+      editingKg: null,
+      blocks: s.blocks.map(b => b.id !== blockId ? b : {
+        ...b,
+        sets: b.sets.map((set, i) => i !== idx ? set : { ...set, kg: isNaN(v) ? null : v }),
+      }),
+    }));
+  }
+  addSet(blockId) {
+    this.setState(s => ({
+      blocks: s.blocks.map(b => b.id !== blockId ? b : { ...b, sets: [...b.sets, { kg: null, reps: null, rpe: null, confirmed: false }] }),
+    }));
+  }
+  confirmSet(blockId, idx) {
+    this.setState(s => ({
+      blocks: s.blocks.map(b => b.id !== blockId ? b : {
+        ...b,
+        sets: b.sets.map((set, i) => i !== idx ? set : { ...set, confirmed: true }),
+      }),
+    }));
+  }
+  markDone(blockId) {
+    this.setState(s => ({ blocks: s.blocks.map(b => b.id !== blockId ? b : { ...b, done: !b.done }) }));
+  }
+  setWodFormat(blockId, formato) {
+    this.setState(s => ({ blocks: s.blocks.map(b => b.id !== blockId ? b : { ...b, wod: { ...b.wod, formato } }) }));
+  }
+  updateWod(blockId, field, delta) {
+    this.setState(s => ({
+      blocks: s.blocks.map(b => b.id !== blockId ? b : { ...b, wod: { ...b.wod, [field]: Math.max(0, (b.wod[field] || 0) + delta) } }),
+    }));
+  }
+  updateSplitTime(blockId, idx, deltaSec) {
+    this.setState(s => ({
+      blocks: s.blocks.map(b => b.id !== blockId ? b : {
+        ...b,
+        wod: { ...b.wod, splits: b.wod.splits.map((sp, i) => {
+          if (i !== idx) return sp;
+          const total = Math.max(0, (sp.min || 0) * 60 + (sp.sec || 0) + deltaSec);
+          return { ...sp, min: Math.floor(total / 60), sec: total % 60 };
+        }) },
+      }),
+    }));
+  }
+  updateSplitLabel(blockId, idx, text) {
+    this.setState(s => ({
+      blocks: s.blocks.map(b => b.id !== blockId ? b : {
+        ...b,
+        wod: { ...b.wod, splits: b.wod.splits.map((sp, i) => i !== idx ? sp : { ...sp, label: text }) },
+      }),
+    }));
+  }
+  addSplit(blockId) {
+    this.setState(s => ({
+      blocks: s.blocks.map(b => b.id !== blockId ? b : { ...b, wod: { ...b.wod, splits: [...b.wod.splits, { label: '', min: 0, sec: 0 }] } }),
+    }));
+  }
+  toggleBlockAccordion(blockId) {
+    this.setState(s => ({ activeBlock: s.activeBlock === blockId ? null : blockId }));
+  }
+  toggleLibero() {
+    this.setState(s => ({ activeBlock: s.activeBlock === 'libero' ? null : 'libero' }));
+  }
+
+  toggleFilter() { this.setState(s => ({ filterOpen: !s.filterOpen })); }
+  toggleExerciseCompare(name) {
+    this.setState(s => {
+      const has = s.selectedExercises.includes(name);
+      const next = has ? s.selectedExercises.filter(n => n !== name) : [...s.selectedExercises, name];
+      return { selectedExercises: next.length ? next : s.selectedExercises };
+    });
+  }
+  setCalSelected(day) { this.setState({ calSelectedDay: day }); }
+
+  buildBlockView(b) {
+    const isSets = b.tipo !== 'wod';
+    const showBody = this.state.activeBlock === b.id;
+    const badge = { strength: 'STR', complex: 'CPX', wod: 'WOD', accessorio: 'ACC' }[b.tipo];
+    const campi = CAMPI[b.wod ? (b.wod.formato === 'Libero/Altro' ? 'Libero' : b.wod.formato) : 'AMRAP'] || {};
+    const mm = String(b.wod ? b.wod.tempoMin : 0).padStart(2, '0');
+    const ss = String(b.wod ? b.wod.tempoSec : 0).padStart(2, '0');
+
+    const view = {
+      id: b.id, typeBadge: badge, esercizio: b.esercizio, targetLine: b.target,
+      isSets, isWod: b.tipo === 'wod', showBody,
+      borderColor: b.done ? 'oklch(45% 0.1 152 / 0.35)' : 'oklch(45% 0.12 345 / 0.35)',
+      statusLabel: b.done ? '✓ Fatto' : '● Da fare',
+      statusBg: b.done ? 'oklch(80% 0.19 152 / 0.14)' : 'oklch(72% 0.23 345 / 0.12)',
+      statusColor: b.done ? GREEN : MAGENTA,
+      statusBorder: b.done ? 'oklch(80% 0.19 152 / 0.4)' : 'oklch(72% 0.23 345 / 0.4)',
+      doneBtnLabel: b.done ? 'Modifica' : '✓ Segna come fatto',
+      doneBtnBg: b.done ? 'oklch(28% 0.015 265)' : GREEN,
+      doneBtnColor: b.done ? 'oklch(85% 0.01 265)' : 'oklch(12% 0.01 265)',
+      onToggle: () => this.toggleBlockAccordion(b.id),
+      onMarkDone: (e) => { e.stopPropagation(); this.markDone(b.id); },
+    };
+
+    if (isSets) {
+      const kgStep = this.state.kgStep;
+      const firstUnconfirmed = b.sets.findIndex(set => !set.confirmed);
+      const allConfirmed = firstUnconfirmed === -1;
+      const visibleCount = allConfirmed ? b.sets.length : firstUnconfirmed + 1;
+      view.allSetsConfirmed = allConfirmed;
+      const visibleSets = b.sets.slice(0, visibleCount).map((set, idx) => {
+        const key = `${b.id}:${idx}`;
+        const isEditingKg = this.state.editingKg === key;
+        return {
+          num: idx + 1,
+          isConfirmed: !!set.confirmed,
+          kgLabel: set.kg != null ? `${set.kg}kg` : '—',
+          kgRaw: set.kg != null ? set.kg : '',
+          isEditingKg, isNotEditingKg: !isEditingKg,
+          repsLabel: set.reps != null ? `${set.reps}` : '—',
+          rpeLabel: set.rpe != null ? `${set.rpe}` : '—',
+          onKgLabelClick: () => this.startEditKg(key),
+          onKgInputBlur: (e) => this.commitKg(b.id, idx, e.target.value),
+          onKgInputKeyDown: (e) => { if (e.key === 'Enter') e.target.blur(); },
+          onKgMinus: () => this.updateSet(b.id, idx, 'kg', -kgStep),
+          onKgPlus: () => this.updateSet(b.id, idx, 'kg', kgStep),
+          onRepsMinus: () => this.updateSet(b.id, idx, 'reps', -1),
+          onRepsPlus: () => this.updateSet(b.id, idx, 'reps', 1),
+          onRpeMinus: () => this.updateSet(b.id, idx, 'rpe', -0.5),
+          onRpePlus: () => this.updateSet(b.id, idx, 'rpe', 0.5),
+          onConfirm: () => this.confirmSet(b.id, idx),
+        };
+      });
+      view.sets = visibleSets.filter(set => set.isConfirmed);
+      view.activeSetOnly = visibleSets.filter(set => !set.isConfirmed);
+      view.onAddSet = () => this.addSet(b.id);
+    } else {
+      view.wodFormats = WOD_FORMATS.map(f => ({
+        label: f, onClick: () => this.setWodFormat(b.id, f),
+        bg: b.wod.formato === f ? MAGENTA : 'oklch(23% 0.015 265)',
+        color: b.wod.formato === f ? 'oklch(12% 0.01 265)' : 'oklch(75% 0.01 265)',
+      }));
+      view.wod = {
+        showTempo: !!campi.tempo, showRound: !!campi.round, showRepsTotali: !!campi.repsTotali,
+        showRepsExtra: !!campi.repsExtra, showSplits: !!campi.splits,
+        tempoLabel: `${mm}:${ss}`, roundLabel: `${b.wod.round}`, repsTotaliLabel: `${b.wod.repsTotali}`,
+        repsExtraLabel: `${b.wod.repsExtra || 0}`,
+        onMinMinus: () => this.updateWod(b.id, 'tempoMin', -1), onMinPlus: () => this.updateWod(b.id, 'tempoMin', 1),
+        onRoundMinus: () => this.updateWod(b.id, 'round', -1), onRoundPlus: () => this.updateWod(b.id, 'round', 1),
+        onRepsMinus: () => this.updateWod(b.id, 'repsTotali', -1), onRepsPlus: () => this.updateWod(b.id, 'repsTotali', 1),
+        onRepsExtraMinus: () => this.updateWod(b.id, 'repsExtra', -1), onRepsExtraPlus: () => this.updateWod(b.id, 'repsExtra', 1),
+        splits: (b.wod.splits || []).map((sp, idx) => ({
+          label: sp.label, mmss: `${String(sp.min).padStart(2, '0')}:${String(sp.sec).padStart(2, '0')}`,
+          onLabelChange: (e) => this.updateSplitLabel(b.id, idx, e.target.value),
+          onMinMinus: () => this.updateSplitTime(b.id, idx, -5), onMinPlus: () => this.updateSplitTime(b.id, idx, 5),
+        })),
+        onAddSplit: () => this.addSplit(b.id),
+      };
+    }
+    return view;
+  }
+
+  renderVals() {
+    const s = this.state;
+    const blocksView = s.blocks.map(b => this.buildBlockView(b));
+    const doneCount = s.blocks.filter(b => b.done).length;
+
+    const today = new Date();
+    const dow = ['D', 'L', 'M', 'M', 'G', 'V', 'S'];
+    const datePills = Array.from({ length: 7 }).map((_, i) => {
+      const sel = i === s.dateSel;
+      const d = new Date(today); d.setDate(d.getDate() - 3 + i);
+      return {
+        dow: dow[d.getDay()], num: d.getDate(),
+        onClick: () => this.setState({ dateSel: i }),
+        bg: sel ? MAGENTA : 'transparent', color: sel ? 'oklch(12% 0.01 265)' : 'oklch(90% 0.005 265)',
+      };
+    });
+
+    const programDays = [
+      { settimana: 3, giorno: 'Giorno A', focus: 'Squat', bg: 'oklch(23% 0.015 265)', border: 'oklch(30% 0.02 265)' },
+      { settimana: 3, giorno: 'Giorno B', focus: 'Squat + Skill', bg: 'oklch(72% 0.23 345 / 0.1)', border: 'oklch(72% 0.23 345 / 0.4)' },
+      { settimana: 3, giorno: 'Giorno C', focus: 'Metcon', bg: 'oklch(23% 0.015 265)', border: 'oklch(30% 0.02 265)' },
+      { settimana: 4, giorno: 'Giorno A', focus: 'Panca + Trazioni', bg: 'oklch(23% 0.015 265)', border: 'oklch(30% 0.02 265)' },
+      { settimana: 4, giorno: 'Giorno B', focus: 'Metcon', bg: 'oklch(23% 0.015 265)', border: 'oklch(30% 0.02 265)' },
+    ].map(d => ({ ...d, onClick: () => this.closeSubscreen() }));
+
+    const kgStepOptions = [0.5, 1, 2.5, 5].map(v => ({
+      label: `${v}`, onClick: () => this.setState({ kgStep: v }),
+      bg: s.kgStep === v ? MAGENTA : SURFACE_HOVER, color: s.kgStep === v ? 'oklch(12% 0.01 265)' : 'oklch(85% 0.01 265)',
+    }));
+    const repsStepOptions = [1, 2, 5].map(v => ({
+      label: `${v}`, onClick: () => this.setState({ repsStep: v }),
+      bg: s.repsStep === v ? MAGENTA : SURFACE_HOVER, color: s.repsStep === v ? 'oklch(12% 0.01 265)' : 'oklch(85% 0.01 265)',
+    }));
+
+    // ---- Storico ----
+    const storicoTabsDef = [
+      ['1rm', '1RM'], ['wod', 'WOD'], ['volume', 'Volume'], ['confronto', 'Confronto'], ['calendario', 'Calendario'], ['statistiche', 'Statistiche'],
+    ];
+    const storicoTabs = storicoTabsDef.map(([k, l]) => ({
+      label: l, onClick: () => this.setState({ storicoTab: k }),
+      bg: s.storicoTab === k ? MAGENTA : 'oklch(19% 0.015 265)', color: s.storicoTab === k ? 'oklch(12% 0.01 265)' : 'oklch(75% 0.01 265)',
+    }));
+
+    const rangeOptions = ['7g', '30g', '90g', 'Tutto'].map(v => ({
+      label: v, onClick: () => this.setState({ dateRange: v }),
+      bg: s.dateRange === v ? GREEN : SURFACE_HOVER, color: s.dateRange === v ? 'oklch(12% 0.01 265)' : 'oklch(85% 0.01 265)',
+    }));
+    const tipoOptions = ['Tutti', 'Strength', 'Complex', 'WOD', 'Accessorio'].map(v => ({
+      label: v, onClick: () => this.setState({ tipoFilter: v }),
+      bg: s.tipoFilter === v ? GREEN : SURFACE_HOVER, color: s.tipoFilter === v ? 'oklch(12% 0.01 265)' : 'oklch(85% 0.01 265)',
+    }));
+
+    const exerciseColors = { 'Back Squat': GREEN, 'Panca Piana': MAGENTA, 'Stacco da Terra': BLUE, 'Overhead Press': AMBER };
+    const exercises = Object.keys(exerciseColors).map(name => {
+      const sel = s.selectedExercises.includes(name);
+      return {
+        name, dot: sel ? '●' : '○', onClick: () => this.toggleExerciseCompare(name),
+        bg: sel ? 'oklch(23% 0.015 265)' : 'oklch(19% 0.015 265)',
+        color: sel ? exerciseColors[name] : 'oklch(58% 0.02 265)',
+        border: sel ? exerciseColors[name] : 'oklch(30% 0.02 265)',
+      };
+    });
+
+    const trendData = { 'Back Squat': [118, 120, 119, 123, 125, 127], 'Panca Piana': [80, 81, 82, 82, 84, 85], 'Stacco da Terra': [140, 141, 143, 144, 146, 148], 'Overhead Press': [55, 56, 56, 58, 58, 59] };
+    const trendDateLabels = ['12 giu', '19 giu', '26 giu', '3 lug', '10 lug', '17 lug'];
+    const w = 280, h = 130, pad = 10;
+    const allVals = s.selectedExercises.flatMap(name => trendData[name] || []);
+    const min = Math.min(...allVals), max = Math.max(...allVals);
+    const scaleY = (h - 2 * pad) / ((max - min) || 1);
+    const stepX = (w - 2 * pad) / 5;
+    const multiLines = s.selectedExercises.map(name => {
+      const vals = trendData[name] || [];
+      const pts = vals.map((v, i) => `${(pad + i * stepX).toFixed(1)},${(h - pad - (v - min) * scaleY).toFixed(1)}`).join(' ');
+      return { points: pts, color: exerciseColors[name] };
+    });
+    const topExercise = s.selectedExercises[0];
+    const topVals = trendData[topExercise] || [];
+    const topCoords = topVals.map((v, i) => ({ cx: (pad + i * stepX).toFixed(1), cy: (h - pad - (v - min) * scaleY).toFixed(1) }));
+    const trendDots = topCoords.map((c, i) => ({ ...c, fill: i === topCoords.length - 1 ? exerciseColors[topExercise] : 'oklch(60% 0.02 265)' }));
+    const trendLabels = trendDateLabels.map(text => ({ text }));
+    const legend = s.selectedExercises.map(name => ({ name, color: exerciseColors[name] }));
+
+    const wodData = {
+      'Fran': [{ date: '2 giu', value: '8:45' }, { date: '23 giu', value: '8:02' }, { date: '14 lug', value: '7:20' }],
+      'Cindy': [{ date: '9 giu', value: '18 round +4' }, { date: '30 giu', value: '19 round +2' }, { date: '21 lug', value: '21 round' }],
+    };
+    const wodEntries = (wodData[s.selectedWod] || []).map((e, i, arr) => ({ ...e, borderColor: i === arr.length - 1 ? 'oklch(72% 0.23 345 / 0.4)' : 'oklch(28% 0.02 265)', valueColor: i === arr.length - 1 ? MAGENTA : 'oklch(90% 0.005 265)' }));
+    const wodChoices = Object.keys(wodData).map(name => ({
+      name, onClick: () => this.setState({ selectedWod: name }),
+      bg: s.selectedWod === name ? MAGENTA : 'oklch(23% 0.015 265)',
+      color: s.selectedWod === name ? 'oklch(12% 0.01 265)' : 'oklch(78% 0.01 265)',
+    }));
+
+    const weekly = [{ label: 'W27', v: 8200 }, { label: 'W28', v: 9100 }, { label: 'W29', v: 7600 }, { label: 'W30', v: 10400 }];
+    const monthly = [{ label: 'Mag', v: 31000 }, { label: 'Giu', v: 35500 }, { label: 'Lug', v: 27200 }];
+    const maxW = Math.max(...weekly.map(x => x.v)), maxM = Math.max(...monthly.map(x => x.v));
+
+    const periodOptions = ['Sett. 27', 'Sett. 28', 'Sett. 29', 'Sett. 30'].map(v => ({ value: v, label: v }));
+    const compareData = {
+      'Sett. 27': { volume: 8200, tonnellaggio: 2140, sessioni: 4, rpe: 7.8, pr: 0 },
+      'Sett. 28': { volume: 9100, tonnellaggio: 2260, sessioni: 5, rpe: 8.0, pr: 1 },
+      'Sett. 29': { volume: 7600, tonnellaggio: 2050, sessioni: 3, rpe: 7.5, pr: 0 },
+      'Sett. 30': { volume: 10400, tonnellaggio: 2410, sessioni: 5, rpe: 8.3, pr: 2 },
+    };
+    const A = compareData[s.compareA], B = compareData[s.compareB];
+    const cmpRow = (label, ka, unit = '') => {
+      const va = A[ka], vb = B[ka];
+      const delta = vb - va;
+      const sign = delta > 0 ? '+' : '';
+      return { label, a: `${va}${unit}`, b: `${vb}${unit}`, delta: `${sign}${delta}${unit}`, deltaColor: delta >= 0 ? GREEN : MAGENTA };
+    };
+    const compareRows = [
+      cmpRow('Volume tot. (kg)', 'volume'), cmpRow('Tonnellaggio Squat', 'tonnellaggio', 'kg'),
+      cmpRow('Sessioni', 'sessioni'), cmpRow('RPE medio', 'rpe'), cmpRow('PR ottenuti', 'pr'),
+    ];
+
+    const calDowLabels = ['L', 'M', 'M', 'G', 'V', 'S', 'D'].map(text => ({ text }));
+    const intensities = [0, 0, 2, 0, 1, 3, 0, 0, 2, 1, 0, 3, 2, 0, 1, 0, 3, 2, 0, 1, 0, 2, 3, 1, 0, 0, 2, 1, 3, 0, 0];
+    const calCells = intensities.map((lvl, i) => {
+      const day = i + 1;
+      const bg = lvl === 0 ? 'oklch(23% 0.015 265)' : lvl === 1 ? 'oklch(80% 0.19 152 / 0.2)' : lvl === 2 ? 'oklch(80% 0.19 152 / 0.45)' : 'oklch(80% 0.19 152 / 0.8)';
+      const isSel = day === s.calSelectedDay;
+      return {
+        day, bg, color: lvl >= 2 ? 'oklch(12% 0.01 265)' : 'oklch(70% 0.02 265)',
+        border: isSel ? MAGENTA : 'transparent',
+        onClick: () => this.setCalSelected(day),
+      };
+    });
+    const calSelected = s.calSelectedDay ? {
+      dateLabel: `${s.calSelectedDay} luglio`,
+      detail: intensities[s.calSelectedDay - 1] > 0 ? 'Back Squat 5×5 · Fran (For Time) — 3 blocchi completati' : 'Nessun allenamento registrato',
+    } : null;
+
+    const statCards = [
+      { icon: '🔥', value: '12', label: 'giorni streak attuale' },
+      { icon: '🏆', value: '3', label: 'PR questo mese' },
+      { icon: '📊', value: '86%', label: 'aderenza al piano' },
+      { icon: '💪', value: '8.1', label: 'RPE medio 30gg' },
+    ];
+    const rpeCounts = [0, 0, 0, 1, 2, 4, 9, 14, 11, 5];
+    const maxRpe = Math.max(...rpeCounts);
+    const rpeHisto = rpeCounts.map((c, i) => ({
+      label: `${i + 1}`, pct: `${Math.max(4, Math.round((c / maxRpe) * 100))}%`,
+      color: i + 1 >= 9 ? MAGENTA : i + 1 >= 7 ? GREEN : 'oklch(40% 0.02 265)',
+    }));
+
+    return {
+      isLog: s.tab === 'log', isStorico: s.tab === 'storico',
+      setTabLog: () => this.setState({ tab: 'log' }), setTabStorico: () => this.setState({ tab: 'storico' }),
+      tabLogIndicator: s.tab === 'log' ? MAGENTA : 'transparent', tabStoricoIndicator: s.tab === 'storico' ? MAGENTA : 'transparent',
+      tabLogColor: s.tab === 'log' ? 'oklch(94% 0.005 265)' : 'oklch(55% 0.02 265)',
+      tabStoricoColor: s.tab === 'storico' ? 'oklch(94% 0.005 265)' : 'oklch(55% 0.02 265)',
+
+      isLogMain: s.logScreen === 'main', isLogAll: s.logScreen === 'all', isLogSettings: s.logScreen === 'settings',
+      toggleLogMenu: () => this.toggleLogMenu(), logMenuOpen: s.logMenuOpen,
+      openAllWorkouts: () => this.openAllWorkouts(), openSettings: () => this.openSettings(),
+      closeSubscreen: () => this.closeSubscreen(), menuItemHover: { background: SURFACE_HOVER },
+      dayLabel: 'Sett. 3 · Giorno B', focusLabel: 'Squat + Skill',
+      datePills, toggleDateEdit: () => this.toggleDateEdit(), dateEditOpen: s.dateEditOpen,
+      dateInputValue: today.toISOString().slice(0, 10), onDateInputChange: () => {},
+      progressPct: `${Math.round((doneCount / s.blocks.length) * 100)}%`, progressLabel: `${doneCount}/${s.blocks.length} blocchi`,
+      blocksView,
+      libero: { showBody: s.activeBlock === 'libero', onToggle: () => this.toggleLibero() },
+      programDays, kgStepOptions, repsStepOptions,
+
+      storicoTabs,
+      isStorico1rm: s.storicoTab === '1rm', isStoricoWod: s.storicoTab === 'wod', isStoricoVolume: s.storicoTab === 'volume',
+      isStoricoConfronto: s.storicoTab === 'confronto', isStoricoCalendario: s.storicoTab === 'calendario', isStoricoStatistiche: s.storicoTab === 'statistiche',
+      toggleFilter: () => this.toggleFilter(), filterOpen: s.filterOpen, filterBtnBg: s.filterOpen ? 'oklch(23% 0.015 265)' : 'oklch(19% 0.015 265)',
+      rangeOptions, tipoOptions,
+
+      exercises, topExercise, bestValueLabel: `${Math.max(...(trendData[topExercise] || [0]))}kg`,
+      deltaLabel: (() => { const v = trendData[topExercise] || [0, 0]; const d = v[v.length - 1] - v[v.length - 2]; return `${d >= 0 ? '+' : ''}${d.toFixed(1)}kg`; })(),
+      multiLines, trendDots, trendLabels, legend,
+
+      wodChoices, wodEntries,
+      volumeWeekly: weekly.map(x => ({ label: x.label, pct: `${Math.round((x.v / maxW) * 100)}%` })),
+      volumeMonthly: monthly.map(x => ({ label: x.label, pct: `${Math.round((x.v / maxM) * 100)}%` })),
+
+      periodOptions, compareA: s.compareA, compareB: s.compareB,
+      onCompareAChange: (e) => this.setState({ compareA: e.target.value }),
+      onCompareBChange: (e) => this.setState({ compareB: e.target.value }),
+      compareRows,
+
+      calMonthLabel: 'Luglio 2026', calDowLabels, calCells, calSelected,
+      statCards, rpeHisto,
+    };
+  }
+}
+
+</script>
+</body>
+</html>
