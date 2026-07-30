@@ -695,8 +695,39 @@ def _vai_al_giorno(giorno_target: ProgramDay) -> None:
     st.session_state["log_giorno_select"] = giorno_target.giorno_label
 
 
-with SessionLocal() as _session:
-    programmi = _session.query(Program).order_by(Program.data_import.desc()).all()
+@st.cache_data(ttl=300, show_spinner=False)
+def _carica_programmi() -> list:
+    """Programmi importati: cambiano solo quando si importa un nuovo piano in
+    Import Programma, non ad ogni interazione qui. Senza cache, ogni tap su
+    uno stepper (che chiama st.rerun() per il feedback immediato) rifarebbe
+    questa query contro Postgres/Supabase da capo."""
+    with SessionLocal() as _session:
+        return _session.query(Program).order_by(Program.data_import.desc()).all()
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _carica_giorni_programma(program_id: int) -> list:
+    with SessionLocal() as _session:
+        return (
+            _session.query(ProgramDay)
+            .filter_by(program_id=program_id)
+            .order_by(ProgramDay.settimana, ProgramDay.id)
+            .all()
+        )
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _carica_blocchi(giorno_id: int) -> list:
+    with SessionLocal() as _session:
+        return (
+            _session.query(ProgramBlock)
+            .filter_by(day_id=giorno_id)
+            .order_by(ProgramBlock.ordine)
+            .all()
+        )
+
+
+programmi = _carica_programmi()
 
 screen = st.session_state["log_screen"]
 
@@ -725,13 +756,7 @@ elif screen == "all":
     if programma_id is None:
         st.info("Nessun programma disponibile.")
     else:
-        with SessionLocal() as _session:
-            giorni_programma = (
-                _session.query(ProgramDay)
-                .filter_by(program_id=programma_id)
-                .order_by(ProgramDay.settimana, ProgramDay.id)
-                .all()
-            )
+        giorni_programma = _carica_giorni_programma(programma_id)
         giorno_corrente_id = st.session_state.get("log_giorno_id")
         for g in giorni_programma:
             etichetta_riga = f"Settimana {g.settimana} · {g.giorno_label}"
@@ -765,13 +790,7 @@ else:
             nome_scelto = st.selectbox("Programma", nomi_programmi, key="log_programma_select")
             programma_id = id_programmi[nomi_programmi.index(nome_scelto)]
 
-            with SessionLocal() as _session:
-                giorni_programma = (
-                    _session.query(ProgramDay)
-                    .filter_by(program_id=programma_id)
-                    .order_by(ProgramDay.settimana, ProgramDay.id)
-                    .all()
-                )
+            giorni_programma = _carica_giorni_programma(programma_id)
 
             if not giorni_programma:
                 st.warning("Questo programma non ha giorni importati.")
@@ -799,14 +818,7 @@ else:
                 giorno_label_corrente = giorno.giorno_label
                 focus_corrente = giorno.focus
 
-                with SessionLocal() as _session:
-                    blocchi_ids = [
-                        b.id
-                        for b in _session.query(ProgramBlock)
-                        .filter_by(day_id=giorno_selezionato_id)
-                        .order_by(ProgramBlock.ordine)
-                        .all()
-                    ]
+                blocchi_ids = [b.id for b in _carica_blocchi(giorno_selezionato_id)]
 
     col_title, col_menu = st.columns([5, 1])
     with col_title:
@@ -857,13 +869,8 @@ else:
             data_sessione = nuova_data
 
     if usa_piano and giorno_selezionato_id and blocchi_ids:
+        blocchi = _carica_blocchi(giorno_selezionato_id)
         with SessionLocal() as _session:
-            blocchi = (
-                _session.query(ProgramBlock)
-                .filter_by(day_id=giorno_selezionato_id)
-                .order_by(ProgramBlock.ordine)
-                .all()
-            )
             entries_per_blocco: dict = {}
             for e in (
                 _session.query(LogEntry)
