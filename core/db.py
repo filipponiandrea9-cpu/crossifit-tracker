@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import streamlit as st
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 
@@ -23,7 +24,12 @@ else:
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 
+@st.cache_resource(show_spinner=False)
 def init_db() -> None:
+    """Crea/migra lo schema e semina gli esercizi tracciati. Cache_resource la
+    fa girare una sola volta per processo dell'app (non ad ogni rerun causato
+    da un click), evitando un round-trip verso il DB - remoto su Postgres/
+    Supabase - ad ogni interazione utente."""
     Base.metadata.create_all(engine)
     if engine.dialect.name == "sqlite":
         _migrate_schema()
