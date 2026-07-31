@@ -337,7 +337,11 @@ def render_sets_card_body(blocco: ProgramBlock, prefix: str, existing_list: list
         col_add, col_done = st.columns(PRIMARY_SECONDARY_RATIO)
         with col_add:
             if styled_button("+ Aggiungi set", key=f"{prefix}_add"):
-                sets.append({"carico_kg": None, "reps": None, "rpe": None, "confermato": False})
+                if sets:
+                    ultimo_set = sets[-1]
+                    sets.append({"carico_kg": ultimo_set["carico_kg"], "reps": ultimo_set["reps"], "rpe": ultimo_set["rpe"], "confermato": False})
+                else:
+                    sets.append({"carico_kg": None, "reps": None, "rpe": None, "confermato": False})
         with col_done:
             label = "💾 Salva modifiche" if done else "✓ Segna come fatto"
             if styled_button(label, key=f"{prefix}_done", variant="green"):
@@ -598,7 +602,11 @@ def render_sets_card_body_libero(prefix: str, data_sessione: date, giorno_id, ti
         col_add, col_done = st.columns(PRIMARY_SECONDARY_RATIO)
         with col_add:
             if styled_button("+ Aggiungi set", key=f"{prefix}_add"):
-                sets.append({"carico_kg": None, "reps": None, "rpe": None, "confermato": False})
+                if sets:
+                    ultimo_set = sets[-1]
+                    sets.append({"carico_kg": ultimo_set["carico_kg"], "reps": ultimo_set["reps"], "rpe": ultimo_set["rpe"], "confermato": False})
+                else:
+                    sets.append({"carico_kg": None, "reps": None, "rpe": None, "confermato": False})
         with col_done:
             if styled_button("✓ Aggiungi voce", key=f"{prefix}_done", variant="green"):
                 df = pd.DataFrame(sets, columns=["carico_kg", "reps", "rpe"])
