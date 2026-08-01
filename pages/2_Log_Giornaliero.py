@@ -171,7 +171,10 @@ def get_sets_state(block_id, schema_reps: Optional[str], existing_entries: list,
     return st.session_state[key]
 
 
-def simple_stepper(container: dict, field: str, key: str, step, min_value=None, max_value=None, fmt=None, label: str = "valore") -> None:
+def simple_stepper(
+    container: dict, field: str, key: str, step, min_value=None, max_value=None,
+    fmt=None, label: str = "valore", is_int: bool = False,
+) -> None:
     """Mutates container[field] in place and reruns immediately on change, so a
     tap shows its own effect right away instead of lagging one interaction
     behind (the display below is drawn from `value` captured before any click
@@ -180,17 +183,85 @@ def simple_stepper(container: dict, field: str, key: str, step, min_value=None, 
 
     `label` (es. "reps", "RPE") alimenta il tooltip accessibile dei bottoni
     −/+ ("Diminuisci reps"/"Aumenta reps") tramite il parametro help di
-    st.button, dato che Streamlit non espone un aria-label diretto."""
+    st.button, dato che Streamlit non espone un aria-label diretto.
+
+    Tap sul valore centrale passa in modalità "digita il numero" (un
+    st.number_input al posto del testo statico, con un bottone "OK" per
+    confermare e tornare alla vista +/-), stesso pattern usato per il carico
+    in kg_stepper() qui sotto - `editing_field` in session_state tiene traccia
+    di quale stepper è in modifica in questo momento sull'intera pagina, per
+    cui un solo campo alla volta può essere in editing. `is_int` sceglie se il
+    valore digitato va trattato come intero (Reps, Round, Reps extra/totali,
+    Tempo min/sec) o float (RPE, kg, minuti EMOM)."""
     value = container[field]
     fmt = fmt or (lambda v: str(v) if v is not None else "—")
+    editing = st.session_state.get("editing_field") == key
     with st.container(key=f"stepper_inner_{key}"):
-        c1, c2, c3 = st.columns([1, 1.6, 1], gap=STEPPER_INNER_GAP)
+        if editing:
+            c1, c2, c3, c4 = st.columns([1, 2, 1.6, 1], gap=STEPPER_INNER_GAP)
+        else:
+            c1, c2, c3 = st.columns([1, 1.6, 1], gap=STEPPER_INNER_GAP)
+            c4 = None
         with c1:
             minus = styled_button("–", key=f"{key}_m", help=f"Diminuisci {label}")
         with c2:
-            st.markdown(f'<div class="cft-value-label">{fmt(value)}</div>', unsafe_allow_html=True)
-        with c3:
-            plus = styled_button("\\+", key=f"{key}_p", help=f"Aumenta {label}")
+            # minus/plus passano da styled_button(), che oltre a st.container(key=...)
+            # inietta anche un piccolo st.markdown("<style>...") *prima* di aprire quel
+            # container: è proprio quell'elemento markdown, come "sibling" nella stessa
+            # colonna, a occupare lo spazio verticale extra che rende le colonne di
+            # minus/plus più alte (56px) di una cella senza quell'elemento (40px) - da
+            # cui gli 8px di offset quando la riga viene centrata con align-items:center.
+            # Replichiamo qui la stessa identica struttura (markdown "gemello" + stesso
+            # st.container(key=...) di styled_button) così che tutte e tre le celle
+            # della riga abbiano esattamente la stessa altezza naturale.
+            st.markdown("<style></style>", unsafe_allow_html=True)
+            with st.container(key=f"{key}_val"):
+                if editing:
+                    # Clamp difensivo del valore iniziale del widget: se il dato
+                    # esistente fosse fuori range (min_value/max_value), passarlo
+                    # cosi' com'e' a st.number_input solleverebbe un'eccezione.
+                    iniziale = value if value is not None else (min_value if min_value is not None else 0)
+                    if min_value is not None:
+                        iniziale = max(min_value, iniziale)
+                    if max_value is not None:
+                        iniziale = min(max_value, iniziale)
+                    if is_int:
+                        value = st.number_input(
+                            label, value=int(iniziale), step=int(step),
+                            min_value=int(min_value) if min_value is not None else None,
+                            max_value=int(max_value) if max_value is not None else None,
+                            key=f"{key}_input", label_visibility="collapsed",
+                        )
+                    else:
+                        value = st.number_input(
+                            label, value=float(iniziale), step=float(step),
+                            min_value=float(min_value) if min_value is not None else None,
+                            max_value=float(max_value) if max_value is not None else None,
+                            key=f"{key}_input", label_visibility="collapsed",
+                        )
+                    # st.number_input passa min_value/max_value al widget ma non li
+                    # impone rigidamente sul valore digitato (verificato: si può
+                    # ancora digitare un numero fuori range) - clamp esplicito qui,
+                    # stessa regola già applicata sotto per i click +/-.
+                    if min_value is not None:
+                        value = max(min_value, value)
+                    if max_value is not None:
+                        value = min(max_value, value)
+                    container[field] = value
+                else:
+                    if st.button(fmt(value), key=f"{key}_lbl", use_container_width=True, help=f"Modifica manualmente {label}"):
+                        st.session_state["editing_field"] = key
+                        st.rerun()
+        if editing:
+            with c3:
+                if styled_button("OK", key=f"{key}_ok", variant="green", help=f"Conferma {label}"):
+                    st.session_state["editing_field"] = None
+                    st.rerun()
+            with c4:
+                plus = styled_button("\\+", key=f"{key}_p", help=f"Aumenta {label}")
+        else:
+            with c3:
+                plus = styled_button("\\+", key=f"{key}_p", help=f"Aumenta {label}")
     if not (minus or plus):
         return
     if minus:
@@ -218,59 +289,13 @@ def simple_stepper(container: dict, field: str, key: str, step, min_value=None, 
 
 
 def kg_stepper(sets_list: list, idx: int, key: str, step: float) -> None:
-    """Mutates sets_list[idx]['carico_kg'] in place (rather than returning the new
-    value) because the confirm/label buttons below call st.rerun(), which aborts
-    the script before a `s["carico_kg"] = kg_stepper(...)`-style assignment at the
-    call site would ever run - the write has to happen before that point."""
-    value = sets_list[idx]["carico_kg"]
-    editing = st.session_state.get("editing_kg") == key
-    with st.container(key=f"stepper_inner_{key}"):
-        if editing:
-            c1, c2, c3, c4 = st.columns([1, 2, 1.6, 1], gap=STEPPER_INNER_GAP)
-        else:
-            c1, c2, c3 = st.columns([1, 1.6, 1], gap=STEPPER_INNER_GAP)
-            c4 = None
-        with c1:
-            minus = styled_button("–", key=f"{key}_m", help="Diminuisci carico")
-        with c2:
-            # minus/plus passano da styled_button(), che oltre a st.container(key=...)
-            # inietta anche un piccolo st.markdown("<style>...") *prima* di aprire quel
-            # container: è proprio quell'elemento markdown, come "sibling" nella stessa
-            # colonna, a occupare lo spazio verticale extra che rende le colonne di
-            # minus/plus più alte (56px) di una cella senza quell'elemento (40px) - da
-            # cui gli 8px di offset quando la riga viene centrata con align-items:center.
-            # Replichiamo qui la stessa identica struttura (markdown "gemello" + stesso
-            # st.container(key=...) di styled_button) così che tutte e tre le celle
-            # della riga abbiano esattamente la stessa altezza naturale.
-            st.markdown("<style></style>", unsafe_allow_html=True)
-            with st.container(key=f"{key}_val"):
-                if editing:
-                    value = st.number_input(
-                        "kg", value=float(value or 0.0), step=0.5, key=f"{key}_input",
-                        label_visibility="collapsed",
-                    )
-                    sets_list[idx]["carico_kg"] = value
-                else:
-                    label = f"{value:g}kg" if value is not None else "—"
-                    if st.button(label, key=f"{key}_lbl", use_container_width=True, help="Modifica manualmente il carico"):
-                        st.session_state["editing_kg"] = key
-                        st.rerun()
-        if editing:
-            with c3:
-                if styled_button("OK", key=f"{key}_ok", variant="green", help="Conferma il carico inserito"):
-                    st.session_state["editing_kg"] = None
-                    st.rerun()
-            with c4:
-                plus = styled_button("\\+", key=f"{key}_p", help="Aumenta carico")
-        else:
-            with c3:
-                plus = styled_button("\\+", key=f"{key}_p", help="Aumenta carico")
-    if minus:
-        sets_list[idx]["carico_kg"] = max(0.0, (value or 0.0) - step)
-        st.rerun()
-    if plus:
-        sets_list[idx]["carico_kg"] = (value or 0.0) + step
-        st.rerun()
+    """Stepper del carico (kg) per le serie forza/complex: alias su
+    simple_stepper con l'etichetta "Xkg" e il minimo 0 già impliciti
+    nell'uso storico di questo campo."""
+    simple_stepper(
+        sets_list[idx], "carico_kg", key, step=step, min_value=0.0,
+        fmt=lambda v: f"{v:g}kg" if v is not None else "—", label="carico",
+    )
 
 
 def _riga_set_confermato(num: int, s: dict) -> str:
@@ -322,7 +347,7 @@ def render_sets_card_body(blocco: ProgramBlock, prefix: str, existing_list: list
             with c_reps:
                 simple_stepper(
                     s, "reps", f"{row_key}_reps", step=reps_step, min_value=0,
-                    fmt=lambda v: str(int(v)) if v is not None else "—", label="reps",
+                    fmt=lambda v: str(int(v)) if v is not None else "—", label="reps", is_int=True,
                 )
             with c_rpe:
                 simple_stepper(
@@ -415,31 +440,31 @@ def render_wod_card_body(blocco: Optional[ProgramBlock], prefix: str, existing_l
                         with cm:
                             simple_stepper(
                                 wstate, "tempo_min", f"{prefix}_min", step=1, min_value=0,
-                                fmt=lambda v: f"{int(v):02d}", label="minuti",
+                                fmt=lambda v: f"{int(v):02d}", label="minuti", is_int=True,
                             )
                         with cs:
                             simple_stepper(
                                 wstate, "tempo_sec", f"{prefix}_sec", step=1, min_value=0, max_value=59,
-                                fmt=lambda v: f"{int(v):02d}", label="secondi",
+                                fmt=lambda v: f"{int(v):02d}", label="secondi", is_int=True,
                             )
                     elif campo == "round":
                         etichetta = "Round / intervallo" if formato == "EMOM" else "Round completati"
                         st.markdown(f'<div class="cft-mini-label">{etichetta}</div>', unsafe_allow_html=True)
                         simple_stepper(
                             wstate, "round", f"{prefix}_round", step=1, min_value=0, fmt=lambda v: str(int(v)),
-                            label="round",
+                            label="round", is_int=True,
                         )
                     elif campo == "reps_extra":
                         st.markdown('<div class="cft-mini-label">Reps extra</div>', unsafe_allow_html=True)
                         simple_stepper(
                             wstate, "reps_extra", f"{prefix}_repsextra", step=1, min_value=0, fmt=lambda v: str(int(v)),
-                            label="reps extra",
+                            label="reps extra", is_int=True,
                         )
                     elif campo == "reps_totali":
                         st.markdown('<div class="cft-mini-label">Reps totali</div>', unsafe_allow_html=True)
                         simple_stepper(
                             wstate, "reps_totali", f"{prefix}_repstot", step=1, min_value=0, fmt=lambda v: str(int(v)),
-                            label="reps totali",
+                            label="reps totali", is_int=True,
                         )
                     elif campo == "emom_minuti":
                         st.markdown('<div class="cft-mini-label">Min / round</div>', unsafe_allow_html=True)
@@ -477,7 +502,7 @@ def render_wod_card_body(blocco: Optional[ProgramBlock], prefix: str, existing_l
                 with c_stepper:
                     simple_stepper(
                         sp, "time_sec", f"{row_key}_time", step=5, min_value=0,
-                        fmt=lambda v: f"{int(v) // 60}:{int(v) % 60:02d}", label="tempo parziale",
+                        fmt=lambda v: f"{int(v) // 60}:{int(v) % 60:02d}", label="tempo parziale", is_int=True,
                     )
         if styled_button("+ Aggiungi parziale", key=f"{prefix}_addsplit"):
             splits.append({"label": "", "time_sec": 0})
@@ -595,7 +620,7 @@ def render_sets_card_body_libero(prefix: str, data_sessione: date, giorno_id, ti
             with c_reps:
                 simple_stepper(
                     s, "reps", f"{row_key}_reps", step=reps_step, min_value=0,
-                    fmt=lambda v: str(int(v)) if v is not None else "—", label="reps",
+                    fmt=lambda v: str(int(v)) if v is not None else "—", label="reps", is_int=True,
                 )
             with c_rpe:
                 simple_stepper(
