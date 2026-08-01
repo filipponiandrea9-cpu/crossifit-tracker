@@ -55,6 +55,7 @@ inject_global_css()
 TYPE_BADGE = {"strength": "STR", "complex": "CPX", "wod": "WOD", "accessorio": "ACC"}
 FORMATO_CHIP_LABELS = {LIBERO: "Libero"}
 DOW_LABELS = ["L", "M", "M", "G", "V", "S", "D"]  # weekday(): lunedì=0 ... domenica=6
+MESI_ABBR = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"]
 
 st.session_state.setdefault("log_screen", "main")
 st.session_state.setdefault("log_menu_open", False)
@@ -838,64 +839,86 @@ elif screen == "all":
                 st.rerun()
 
 else:
-    usa_piano = st.toggle("Collega a un allenamento pianificato", value=bool(programmi), key="log_usa_piano_toggle")
+    # --- Navigatore compatto Programma/Settimana/Giorno/Data (vedi
+    # design_handoff_log_navigator/README.md, opzione 1b) al posto del vecchio
+    # toggle sempre visibile + le due select + la riga di 7 pillole data.
+
+    # Fase 1: calcola lo stato corrente (programma/settimana/giorno) leggendo/
+    # normalizzando session_state, SENZA disegnare ancora nessun controllo -
+    # serve a Riga 1 per mostrare subito il sottotitolo con focus corretto.
+    if not programmi:
+        usa_piano = False
+        programma_id = None
+    elif len(programmi) == 1:
+        usa_piano = True
+        programma_id = programmi[0].id
+    else:
+        st.session_state.setdefault("log_usa_piano_toggle", True)
+        usa_piano = st.session_state["log_usa_piano_toggle"]
+        nomi_programmi = [p.nome_mese for p in programmi]
+        if st.session_state.get("log_programma_select") not in nomi_programmi:
+            st.session_state["log_programma_select"] = nomi_programmi[0]
+        programma_id = next(p.id for p in programmi if p.nome_mese == st.session_state["log_programma_select"])
 
     giorno_selezionato_id = None
     blocchi_ids = []
     settimana_corrente = giorno_label_corrente = focus_corrente = None
+    giorni_programma: list = []
+    settimana_scelta = None
+    labels: list = []
+    label_scelta = None
 
-    if usa_piano:
-        if not programmi:
-            st.info(
-                "Nessun programma importato ancora. Vai su 'Import Programma', oppure usa la "
-                "sezione 'Aggiungi voce senza piano' qui sotto per loggare senza piano."
-            )
+    if usa_piano and programma_id is not None:
+        giorni_programma = _carica_giorni_programma(programma_id)
+        if not giorni_programma:
+            st.warning("Questo programma non ha giorni importati.")
         else:
-            nomi_programmi = [p.nome_mese for p in programmi]
-            id_programmi = [p.id for p in programmi]
-            if "log_programma_select" not in st.session_state or st.session_state["log_programma_select"] not in nomi_programmi:
-                st.session_state["log_programma_select"] = nomi_programmi[0]
-            nome_scelto = st.selectbox("Programma", nomi_programmi, key="log_programma_select")
-            programma_id = id_programmi[nomi_programmi.index(nome_scelto)]
-
-            giorni_programma = _carica_giorni_programma(programma_id)
-
-            if not giorni_programma:
-                st.warning("Questo programma non ha giorni importati.")
+            settimane = sorted({g.settimana for g in giorni_programma})
+            settimane_str = [str(s) for s in settimane]
+            # log_settimana_select puo' arrivare qui anche come int puro (lo
+            # scrive cosi' _vai_al_giorno() dalla sotto-schermata "Tutti gli
+            # allenamenti"): normalizzo sempre a stringa, che e' il tipo con
+            # cui lavora chip_selector piu' sotto.
+            if str(st.session_state.get("log_settimana_select")) not in settimane_str:
+                st.session_state["log_settimana_select"] = settimane_str[0]
             else:
-                settimane = sorted({g.settimana for g in giorni_programma})
-                if st.session_state.get("log_settimana_select") not in settimane:
-                    st.session_state["log_settimana_select"] = settimane[0]
+                st.session_state["log_settimana_select"] = str(st.session_state["log_settimana_select"])
+            settimana_scelta = int(st.session_state["log_settimana_select"])
 
-                col_sett, col_giorno = st.columns(2)
-                with col_sett:
-                    settimana_scelta = st.selectbox("Settimana", settimane, key="log_settimana_select")
+            giorni_settimana = [g for g in giorni_programma if g.settimana == settimana_scelta]
+            labels = [g.giorno_label for g in giorni_settimana]
+            if st.session_state.get("log_giorno_select") not in labels:
+                st.session_state["log_giorno_select"] = labels[0]
+            label_scelta = st.session_state["log_giorno_select"]
 
-                giorni_settimana = [g for g in giorni_programma if g.settimana == settimana_scelta]
-                labels = [g.giorno_label for g in giorni_settimana]
-                if st.session_state.get("log_giorno_select") not in labels:
-                    st.session_state["log_giorno_select"] = labels[0]
+            giorno = next(g for g in giorni_settimana if g.giorno_label == label_scelta)
+            st.session_state["log_giorno_id"] = giorno.id
+            giorno_selezionato_id = giorno.id
+            settimana_corrente = giorno.settimana
+            giorno_label_corrente = giorno.giorno_label
+            focus_corrente = giorno.focus
 
-                with col_giorno:
-                    label_scelta = st.selectbox("Allenamento", labels, key="log_giorno_select")
+            blocchi_ids = [b.id for b in _carica_blocchi(giorno_selezionato_id)]
 
-                giorno = next(g for g in giorni_settimana if g.giorno_label == label_scelta)
-                st.session_state["log_giorno_id"] = giorno.id
-                giorno_selezionato_id = giorno.id
-                settimana_corrente = giorno.settimana
-                giorno_label_corrente = giorno.giorno_label
-                focus_corrente = giorno.focus
-
-                blocchi_ids = [b.id for b in _carica_blocchi(giorno_selezionato_id)]
-
+    # Riga 1 — titolo + sottotitolo programma (cliccabile solo con >1 programma;
+    # con un solo programma è già la scelta implicita, niente popover).
     col_title, col_menu = st.columns([5, 1])
     with col_title:
         st.markdown("## Log")
-        if giorno_label_corrente:
-            sottotitolo = f"Sett. {settimana_corrente} · {giorno_label_corrente}"
-            if focus_corrente:
-                sottotitolo += f" · {focus_corrente}"
-            st.markdown(f'<div style="color:{TEXT_SECONDARY}; font-size:14px; margin-top:-8px;">{sottotitolo}</div>', unsafe_allow_html=True)
+        if programmi:
+            nome_prog_corrente = next((p.nome_mese for p in programmi if p.id == programma_id), programmi[0].nome_mese)
+            focus_suffix = f" · {focus_corrente}" if focus_corrente else ""
+            if len(programmi) > 1:
+                if text_button(f"**{nome_prog_corrente}**{focus_suffix}  ⌄", key="log_program_subtitle"):
+                    st.session_state["log_program_popover_open"] = not st.session_state.get("log_program_popover_open", False)
+                    st.rerun()
+            else:
+                st.markdown(
+                    f'<div style="font-size:13px; margin-top:4px;">'
+                    f'<span style="color:{TEXT_PRIMARY}; font-weight:700;">{nome_prog_corrente}</span>'
+                    f'<span style="color:{TEXT_SECONDARY};">{focus_suffix}</span></div>',
+                    unsafe_allow_html=True,
+                )
     with col_menu:
         if icon_button("⋯", key="log_menu_icon", active=st.session_state.get("log_menu_open", False), help="Altre opzioni"):
             st.session_state["log_menu_open"] = not st.session_state.get("log_menu_open", False)
@@ -912,19 +935,82 @@ else:
                 st.session_state["log_menu_open"] = False
                 st.rerun()
 
+    if len(programmi) > 1 and st.session_state.get("log_program_popover_open"):
+        with popover_panel("log_program_popover"):
+            # Il toggle "piano/libero" si sposta qui (assieme alla scelta
+            # programma) invece di stare sempre visibile in cima.
+            # value=usa_piano esplicito: il widget e' montato solo quando il
+            # popover e' aperto (condizionale), e al primissimo mount NON
+            # rifletteva session_state pre-impostato da setdefault() sopra -
+            # restava graficamente su "off" anche a usa_piano=True finche' non
+            # veniva toccato una volta (bug di visualizzazione, verificato).
+            st.toggle("Collega a un allenamento pianificato", value=usa_piano, key="log_usa_piano_toggle")
+            nomi_programmi = [p.nome_mese for p in programmi]
+            corrente = st.session_state.get("log_programma_select", nomi_programmi[0])
+            opzioni_prog = [(n, f"{n}  ✓" if n == corrente else n) for n in nomi_programmi]
+            chip_selector(opzioni_prog, session_key="log_programma_select", per_row=1)
+
+    # Riga 2 — card Settimana/Giorno: cliccabile, apre un popover con due righe
+    # di chip al posto delle vecchie due st.selectbox.
+    if usa_piano and giorni_programma:
+        titolo_card = f"Sett. {settimana_corrente} · {giorno_label_corrente}"
+        sottotitolo_card = f"{focus_corrente} — tocca per cambiare" if focus_corrente else "Tocca per cambiare"
+        if styled_button(f"**{titolo_card}**  \n{sottotitolo_card}  ⌄", key="log_daynav_card", variant="neutral"):
+            st.session_state["log_daynav_popover_open"] = not st.session_state.get("log_daynav_popover_open", False)
+            st.rerun()
+
+        if st.session_state.get("log_daynav_popover_open"):
+            with popover_panel("log_daynav_popover"):
+                st.markdown('<div class="cft-mini-label" style="text-align:left; margin-bottom:2px;">Settimana</div>', unsafe_allow_html=True)
+                chip_selector(
+                    [(s, s) for s in settimane_str], session_key="log_settimana_select",
+                    default=str(settimana_scelta), per_row=min(len(settimane_str), 6) or 1,
+                )
+
+                st.markdown(
+                    '<div class="cft-mini-label" style="text-align:left; margin-bottom:2px; margin-top:10px;">Allenamento</div>',
+                    unsafe_allow_html=True,
+                )
+                # Riga giorno costruita a mano (non chip_selector) solo perché
+                # qui, a differenza della settimana, la scelta deve anche
+                # chiudere il popover subito - chip_selector fa già il suo
+                # st.rerun() interno appena cliccato, quindi non c'è modo di
+                # aggiungere quella chiusura *dopo* averlo chiamato.
+                cols_giorno = st.columns(min(len(labels), 4) or 1)
+                for i, lab in enumerate(labels):
+                    with cols_giorno[i % len(cols_giorno)]:
+                        variant = "magenta" if lab == label_scelta else "neutral"
+                        if styled_button(lab, key=f"log_daynav_giorno_{i}", variant=variant):
+                            st.session_state["log_giorno_select"] = lab
+                            st.session_state["log_daynav_popover_open"] = False
+                            st.rerun()
+
+    # Riga 3 — data di log: sposta data_sessione ± 1 giorno, indipendente dal
+    # giorno di piano scelto in Riga 2 (per questo è una riga separata).
     st.session_state.setdefault("log_data_sessione", date.today())
     data_sessione = st.session_state["log_data_sessione"]
 
-    col_pills, col_cal = st.columns([6, 1])
-    with col_pills:
-        cols_date = st.columns(7)
-        giorni_settimana_corrente = [data_sessione + timedelta(days=i - 3) for i in range(7)]
-        for col, d in zip(cols_date, giorni_settimana_corrente):
-            with col:
-                variant = "magenta" if d == data_sessione else "neutral"
-                if styled_button(f"{DOW_LABELS[d.weekday()]} {d.day}", key=f"datepill_{d.isoformat()}", variant=variant):
-                    st.session_state["log_data_sessione"] = d
-                    st.rerun()
+    col_data_label, col_data_stepper, col_cal = st.columns([1.3, 4.4, 0.9])
+    with col_data_label:
+        st.markdown(f'<div style="color:{TEXT_TERTIARY}; font-size:11px; padding-top:9px;">Data log</div>', unsafe_allow_html=True)
+    with col_data_stepper:
+        with st.container(key="stepper_inner_log_data"):
+            c_data_prev, c_data_lbl, c_data_next = st.columns([1, 3.4, 1], gap=STEPPER_INNER_GAP)
+            with c_data_prev:
+                data_prev = icon_button("‹", key="log_data_prev", help="Giorno precedente")
+            with c_data_lbl:
+                etichetta_data = f"{DOW_LABELS[data_sessione.weekday()]} {data_sessione.day} {MESI_ABBR[data_sessione.month - 1]}"
+                if data_sessione == date.today():
+                    etichetta_data += " · oggi"
+                st.markdown(f'<div class="cft-value-label">{etichetta_data}</div>', unsafe_allow_html=True)
+            with c_data_next:
+                data_next = icon_button("›", key="log_data_next", help="Giorno successivo")
+        if data_prev:
+            st.session_state["log_data_sessione"] = data_sessione - timedelta(days=1)
+            st.rerun()
+        if data_next:
+            st.session_state["log_data_sessione"] = data_sessione + timedelta(days=1)
+            st.rerun()
     with col_cal:
         if icon_button("📅", key="log_cal_icon", active=st.session_state.get("log_cal_open", False), help="Scegli un'altra data"):
             st.session_state["log_cal_open"] = not st.session_state.get("log_cal_open", False)
