@@ -143,7 +143,15 @@ def parse_program_with_claude(raw_text: str) -> dict:
 
     response = client.messages.create(
         model=MODEL,
-        max_tokens=8000,
+        # claude-opus-5 supporta fino a 128k token di output sulla Messages API
+        # sincrona: un programma mensile completo puo' superare di gran lunga
+        # il precedente limite di 8000, troncando il JSON a meta'.
+        max_tokens=128000,
+        # Con max_tokens cosi' alto l'SDK richiederebbe streaming per richieste
+        # potenzialmente sopra i 10 minuti; un timeout esplicito piu' ampio
+        # evita l'errore anche restando su una chiamata sincrona (il tempo
+        # reale e' legato ai token effettivamente generati, non al tetto).
+        timeout=1200.0,
         system=SYSTEM_PROMPT,
         output_config={"effort": "medium", "format": {"type": "json_schema", "schema": PROGRAM_JSON_SCHEMA}},
         messages=[
@@ -153,6 +161,12 @@ def parse_program_with_claude(raw_text: str) -> dict:
             }
         ],
     )
+
+    if response.stop_reason == "max_tokens":
+        raise ValueError(
+            "Il programma è troppo lungo per essere elaborato in un'unica risposta. "
+            "Prova a dividerlo in due file più corti (es. due metà del mese)."
+        )
 
     text = next(block.text for block in response.content if block.type == "text")
     return json.loads(text)

@@ -1,4 +1,5 @@
 from datetime import date
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import plotly.express as px
@@ -15,6 +16,7 @@ from core.exercise_names import (
     trova_possibili_duplicati,
     unifica_nomi_esercizio,
 )
+from core.llm_parser import parse_program_with_claude
 from core.models import Base, Exercise, Log, LogEntry, Program, ProgramBlock, ProgramDay
 from core.wod_format import (
     AMRAP,
@@ -368,3 +370,15 @@ def test_dopo_merge_il_nome_scartato_scompare_dai_nomi_esistenti(db_session):
     nomi = get_nomi_esercizi_esistenti(db_session)
     assert "Bb Back Squat" not in nomi
     assert "Back Squat" in nomi
+
+
+def test_parse_program_with_claude_segnala_troncamento_invece_di_json_grezzo():
+    """Se Claude tronca la risposta per max_tokens, deve arrivare un errore
+    leggibile prima del json.loads, non un JSONDecodeError criptico."""
+    risposta_troncata = MagicMock()
+    risposta_troncata.stop_reason = "max_tokens"
+
+    with patch("core.llm_parser.anthropic.Anthropic") as MockAnthropic:
+        MockAnthropic.return_value.messages.create.return_value = risposta_troncata
+        with pytest.raises(ValueError, match="troppo lungo"):
+            parse_program_with_claude("Week 1\nDay 1 - Test\n• Bb Back Squat 5-5-5")
