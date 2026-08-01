@@ -389,6 +389,7 @@ def render_sets_card_body(blocco: ProgramBlock, prefix: str, existing_list: list
                         log = get_or_create_log(save_session, data_sessione, giorno_id)
                         n = save_sets(save_session, log.id, blocco.id, blocco.tipo, blocco.esercizio, df)
                         save_session.commit()
+                    _carica_entries_per_blocco.clear()
                     for a in avvisi:
                         st.warning(f"{a} Il set non sarà incluso nei grafici di trend/progressi.")
                     st.toast(f"Salvato: {blocco.esercizio}", icon="✅")
@@ -534,6 +535,7 @@ def render_wod_card_body(blocco: Optional[ProgramBlock], prefix: str, existing_l
                 block_id = blocco.id if blocco is not None else None
                 salva_wod(save_session, log.id, block_id, tipo, esercizio, values)
                 save_session.commit()
+            _carica_entries_per_blocco.clear()
             st.toast(f"Salvato: {esercizio}", icon="✅")
             st.session_state.pop(state_key, None)
             st.session_state.pop(f"{prefix}_splits_state", None)
@@ -658,6 +660,7 @@ def render_sets_card_body_libero(prefix: str, data_sessione: date, giorno_id, ti
                         log = get_or_create_log(save_session, data_sessione, giorno_id)
                         n = save_sets(save_session, log.id, None, tipo, esercizio, df)
                         save_session.commit()
+                    _carica_entries_per_blocco.clear()
                     for a in avvisi:
                         st.warning(f"{a} Il set non sarà incluso nei grafici di trend/progressi.")
                     st.toast(f"Aggiunto: {esercizio}", icon="✅")
@@ -771,6 +774,25 @@ def _carica_blocchi(giorno_id: int) -> list:
             .order_by(ProgramBlock.ordine)
             .all()
         )
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _carica_entries_per_blocco(giorno_id: int, data: date) -> dict:
+    """A differenza di programmi/giorni/blocchi, cambia ad ogni salvataggio di
+    un set o un WOD - non e' "statica" come quelle, quindi va invalidata
+    esplicitamente con _carica_entries_per_blocco.clear() subito dopo ogni
+    save_session.commit() (vedi i tre punti di salvataggio più sotto), non
+    lasciata scadere solo con il ttl."""
+    with SessionLocal() as _session:
+        entries: dict = {}
+        for e in (
+            _session.query(LogEntry)
+            .join(Log)
+            .filter(Log.data == data, Log.day_id == giorno_id)
+            .all()
+        ):
+            entries.setdefault(e.block_id, []).append(e)
+        return entries
 
 
 programmi = _carica_programmi()
@@ -916,15 +938,7 @@ else:
 
     if usa_piano and giorno_selezionato_id and blocchi_ids:
         blocchi = _carica_blocchi(giorno_selezionato_id)
-        with SessionLocal() as _session:
-            entries_per_blocco: dict = {}
-            for e in (
-                _session.query(LogEntry)
-                .join(Log)
-                .filter(Log.data == data_sessione, Log.day_id == giorno_selezionato_id)
-                .all()
-            ):
-                entries_per_blocco.setdefault(e.block_id, []).append(e)
+        entries_per_blocco = _carica_entries_per_blocco(giorno_selezionato_id, data_sessione)
 
         blocchi_fatti = sum(1 for b in blocchi if entries_per_blocco.get(b.id))
         progress_bar(blocchi_fatti, len(blocchi), f"{blocchi_fatti}/{len(blocchi)} blocchi")
