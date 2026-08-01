@@ -178,18 +178,21 @@ if uploaded_file is not None:
     nome_mese = st.text_input("Nome del mese", value="")
 
     if styled_button("🤖 Genera struttura con Claude", key="parse_btn", variant="magenta", use_container_width=False):
-        with st.spinner("Claude sta analizzando il programma..."):
-            try:
-                parsed = parse_program_with_claude(raw_text)
-            except Exception as exc:
-                st.error(f"Errore durante il parsing: {exc}")
-            else:
-                st.session_state["parsed_program"] = parsed
-                st.session_state["parsed_json_raw"] = str(parsed)
-                st.session_state["editable_df"] = flatten_to_dataframe(parsed)
-                if not nome_mese:
-                    nome_mese = parsed.get("mese", "")
-                st.session_state["nome_mese"] = nome_mese
+        if not nome_mese.strip():
+            st.error("Inserisci il nome del mese prima di avviare il parsing.")
+        else:
+            with st.spinner("Claude sta analizzando il programma..."):
+                try:
+                    parsed = parse_program_with_claude(raw_text)
+                except Exception as exc:
+                    st.error(f"Errore durante il parsing: {exc}")
+                else:
+                    st.session_state["parsed_program"] = parsed
+                    st.session_state["parsed_json_raw"] = str(parsed)
+                    st.session_state["editable_df"] = flatten_to_dataframe(parsed)
+                    if not nome_mese:
+                        nome_mese = parsed.get("mese", "")
+                    st.session_state["nome_mese"] = nome_mese
 
 if "editable_df" in st.session_state:
     df_corrente = st.session_state["editable_df"]
@@ -244,6 +247,7 @@ if "editable_df" in st.session_state:
             st.success(f"Programma '{nome_mese_finale}' salvato correttamente.")
             for key in ["editable_df", "parsed_program", "parsed_json_raw", "nome_mese"]:
                 st.session_state.pop(key, None)
+            st.rerun()
 
 
 st.divider()
