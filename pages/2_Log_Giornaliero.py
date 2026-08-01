@@ -330,6 +330,14 @@ def render_sets_card_body(blocco: ProgramBlock, prefix: str, existing_list: list
                     fmt=lambda v: f"{v:g}" if v is not None else "—", label="RPE",
                 )
         if styled_button(f"✓ Conferma set {i + 1}", key=f"{row_key}_confirm", variant="magenta"):
+            if i + 1 < len(sets) and not sets[i + 1]["confermato"]:
+                # Propaga carico/RPE (non reps, che resta quello da schema) al set
+                # successivo generato in blocco da get_sets_state() - senza questo,
+                # solo i set aggiunti a mano con "+ Aggiungi set" li ereditavano.
+                if sets[i + 1]["carico_kg"] is None:
+                    sets[i + 1]["carico_kg"] = sets[i]["carico_kg"]
+                if sets[i + 1]["rpe"] is None:
+                    sets[i + 1]["rpe"] = sets[i]["rpe"]
             sets[i]["confermato"] = True
             st.rerun()
 
@@ -595,6 +603,11 @@ def render_sets_card_body_libero(prefix: str, data_sessione: date, giorno_id, ti
                     fmt=lambda v: f"{v:g}" if v is not None else "—", label="RPE",
                 )
         if styled_button(f"✓ Conferma set {i + 1}", key=f"{row_key}_confirm", variant="magenta"):
+            if i + 1 < len(sets) and not sets[i + 1]["confermato"]:
+                if sets[i + 1]["carico_kg"] is None:
+                    sets[i + 1]["carico_kg"] = sets[i]["carico_kg"]
+                if sets[i + 1]["rpe"] is None:
+                    sets[i + 1]["rpe"] = sets[i]["rpe"]
             sets[i]["confermato"] = True
             st.rerun()
 
