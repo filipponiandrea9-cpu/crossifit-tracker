@@ -290,6 +290,20 @@ def inject_global_css() -> None:
         [class*="st-key-stepper_row"] [data-testid="stHorizontalBlock"] {{
             align-items: center !important;
         }}
+        /* Su viewport stretti (iPhone) il doppio annidamento st.columns()
+        (gruppo esterno Carico|Reps|RPE -> riga −/valore/+ interna) fa andare
+        a capo il livello interno, trasformando −/valore/+ in una colonna di
+        bottoni a piena larghezza. Forziamo qui SOLO il livello "stepper_inner"
+        (−/valore/+) a restare su una riga orizzontale: il livello esterno
+        "stepper_row" può continuare a impilarsi verticalmente su schermi
+        stretti, è già leggibile così. */
+        [class*="st-key-stepper_inner"] [data-testid="stHorizontalBlock"] {{
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+        }}
+        [class*="st-key-stepper_inner"] [data-testid="stColumn"] {{
+            min-width: 0 !important;
+        }}
         </style>
         """,
         unsafe_allow_html=True,
