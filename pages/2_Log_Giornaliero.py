@@ -833,7 +833,7 @@ elif screen == "all":
                 etichetta_riga += f" — {g.focus}"
             if g.id == giorno_corrente_id:
                 st.markdown(f"➡️ **{etichetta_riga}**")
-            elif st.button(etichetta_riga, key=f"jump_{g.id}", use_container_width=True):
+            elif styled_button(etichetta_riga, key=f"jump_{g.id}", use_container_width=True, wrap=True):
                 _vai_al_giorno(g)
                 st.session_state["log_screen"] = "main"
                 st.rerun()
@@ -909,7 +909,7 @@ else:
             nome_prog_corrente = next((p.nome_mese for p in programmi if p.id == programma_id), programmi[0].nome_mese)
             focus_suffix = f" · {focus_corrente}" if focus_corrente else ""
             if len(programmi) > 1:
-                if text_button(f"**{nome_prog_corrente}**{focus_suffix}  ⌄", key="log_program_subtitle"):
+                if text_button(f"**{nome_prog_corrente}**{focus_suffix}  ⌄", key="log_program_subtitle", wrap=True):
                     st.session_state["log_program_popover_open"] = not st.session_state.get("log_program_popover_open", False)
                     st.rerun()
             else:
@@ -955,7 +955,7 @@ else:
     if usa_piano and giorni_programma:
         titolo_card = f"Sett. {settimana_corrente} · {giorno_label_corrente}"
         sottotitolo_card = f"{focus_corrente} — tocca per cambiare" if focus_corrente else "Tocca per cambiare"
-        if styled_button(f"**{titolo_card}**  \n{sottotitolo_card}  ⌄", key="log_daynav_card", variant="neutral"):
+        if styled_button(f"**{titolo_card}**  \n{sottotitolo_card}  ⌄", key="log_daynav_card", variant="neutral", wrap=True):
             st.session_state["log_daynav_popover_open"] = not st.session_state.get("log_daynav_popover_open", False)
             st.rerun()
 

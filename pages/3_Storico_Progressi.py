@@ -382,19 +382,23 @@ if vista == "1rm":
         st.caption("Tocca per aggiungere/togliere dal confronto (max 4)")
         for i in range(0, len(nomi), 4):
             riga = nomi[i : i + 4]
-            cols = st.columns(len(riga))
-            for j, (col, nome) in enumerate(zip(cols, riga)):
-                with col:
-                    attivo = nome in selezionati
-                    if styled_button(nome, key=f"1rm_chip_{i + j}", variant="magenta" if attivo else "neutral"):
-                        if attivo:
-                            if len(selezionati) > 1:
-                                selezionati.remove(nome)
-                        elif len(selezionati) < 4:
-                            selezionati.append(nome)
-                        else:
-                            st.toast("Massimo 4 esercizi sovrapponibili nello stesso grafico.", icon="⚠️")
-                        st.rerun()
+            # Chiave "chiprow_*" (vedi inject_global_css): se le chip non ci
+            # stanno neppure restringendosi al minimo, la riga scorre in
+            # orizzontale invece di impilarsi o schiacciare il testo.
+            with st.container(key=f"chiprow_1rm_{i}"):
+                cols = st.columns(len(riga))
+                for j, (col, nome) in enumerate(zip(cols, riga)):
+                    with col:
+                        attivo = nome in selezionati
+                        if styled_button(nome, key=f"1rm_chip_{i + j}", variant="magenta" if attivo else "neutral"):
+                            if attivo:
+                                if len(selezionati) > 1:
+                                    selezionati.remove(nome)
+                            elif len(selezionati) < 4:
+                                selezionati.append(nome)
+                            else:
+                                st.toast("Massimo 4 esercizi sovrapponibili nello stesso grafico.", icon="⚠️")
+                            st.rerun()
 
         colori_hex = [GREEN_HEX, MAGENTA_HEX, BLUE_HEX, AMBER_HEX]
         serie = []

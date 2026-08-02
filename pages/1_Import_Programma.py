@@ -278,7 +278,7 @@ else:
             unsafe_allow_html=True,
         )
         with st.container(key=card_key, border=True):
-            col_info, col_del = st.columns([4, 1])
+            col_info, col_del = st.columns([3, 2])
             with col_info:
                 st.markdown(
                     f'<div style="color:{TEXT_PRIMARY}; font-weight:700; font-size:14px;">{p.nome_mese}</div>'
@@ -288,7 +288,7 @@ else:
                     unsafe_allow_html=True,
                 )
             with col_del:
-                if styled_button("🗑️ Elimina", key=f"del_btn_{p.id}", use_container_width=True):
+                if styled_button("🗑️ Elimina", key=f"del_btn_{p.id}", use_container_width=True, wrap=True):
                     st.session_state[f"confirm_delete_{p.id}"] = True
                     st.rerun()
 
@@ -303,7 +303,7 @@ else:
                 with col_yes:
                     if styled_button(
                         "Elimina definitivamente", key=f"del_confirm_{p.id}",
-                        variant="magenta", disabled=not conferma,
+                        variant="magenta", disabled=not conferma, wrap=True,
                     ):
                         with SessionLocal() as _save_session:
                             programma_da_eliminare = _save_session.get(Program, p.id)

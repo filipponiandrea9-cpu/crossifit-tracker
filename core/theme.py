@@ -117,6 +117,7 @@ def inject_global_css() -> None:
             border-radius: 10px;
             font-weight: 600;
             white-space: nowrap;
+            -webkit-tap-highlight-color: transparent;
         }}
         .stButton button:hover, .stDownloadButton button:hover {{
             border-color: {MAGENTA};
@@ -178,6 +179,10 @@ def inject_global_css() -> None:
             color: {TEXT_PRIMARY} !important;
             border: 1px solid {BORDER} !important;
             border-radius: 8px !important;
+            /* Sotto i 16px Safari iOS fa zoom automatico al focus, rompendo il
+            layout: già così di default nel tema, fissato esplicitamente per
+            non dipendere da quello. */
+            font-size: 16px !important;
         }}
         [data-baseweb="select"] > div {{
             background: {SURFACE_HOVER} !important;
@@ -220,6 +225,7 @@ def inject_global_css() -> None:
             border-radius: 6px;
             padding: 3px 6px;
             display: inline-block;
+            white-space: nowrap;
         }}
 
         .cft-progress-track {{
@@ -290,19 +296,88 @@ def inject_global_css() -> None:
         [class*="st-key-stepper_row"] [data-testid="stHorizontalBlock"] {{
             align-items: center !important;
         }}
-        /* Su viewport stretti (iPhone) il doppio annidamento st.columns()
-        (gruppo esterno Carico|Reps|RPE -> riga −/valore/+ interna) fa andare
-        a capo il livello interno, trasformando −/valore/+ in una colonna di
-        bottoni a piena larghezza. Forziamo qui SOLO il livello "stepper_inner"
-        (−/valore/+) a restare su una riga orizzontale: il livello esterno
-        "stepper_row" può continuare a impilarsi verticalmente su schermi
-        stretti, è già leggibile così. */
+        /* ===== Layout responsive iPhone/Safari iOS =====
+        Di default, su viewport stretti Streamlit forza min-width al 100% sulle
+        colonne ANNIDATE di st.columns() e manda a capo [data-testid=
+        "stHorizontalBlock"] (il div dietro st.columns()), trasformando ogni
+        riga di controlli - steppers, chip selector, coppie "← Torna"+titolo,
+        tab, righe di icon_button, calendario - in una lunga colonna di
+        elementi a piena larghezza invece di restare compatta come su
+        desktop. L'app è pensata per righe compatte anche su mobile (vedi
+        screenshot di design), quindi lo forziamo qui come default globale:
+        nessun wrap sulla riga, nessun min-width minimo sulle colonne (si
+        restringono liberamente). Le eccezioni volute (stacking verticale
+        ancora desiderato) sono dichiarate SOTTO con selettori più specifici:
+        stessa specificità del default ma dichiarati dopo, quindi vincono per
+        gli elementi che matchano entrambi. */
+        [data-testid="stHorizontalBlock"] {{
+            flex-wrap: nowrap !important;
+        }}
+        [data-testid="stColumn"] {{
+            min-width: 0 !important;
+        }}
+
+        /* Le due eccezioni sotto (grafici Plotly affiancati, gruppo esterno
+        stepper_row) devono restare come oggi SOLO su desktop - la regola
+        globale sopra è unconditional (nessuna media query) quindi disattiva
+        anche lo stacking automatico che Streamlit applicava di suo, in modo
+        implicito, solo sotto una certa larghezza. Le reintroduciamo qui
+        esplicitamente ma vincolate a viewport stretti, per non forzare lo
+        stacking anche su desktop dove invece la riga singola affiancata è
+        il comportamento originale voluto. */
+        @media (max-width: 600px) {{
+            /* Eccezione: coppie di grafici Plotly affiancati (Storico >
+            Volume, settimanale/mensile) - compressi a metà larghezza
+            sarebbero illeggibili, restano impilati come farebbe Streamlit
+            di default. */
+            [data-testid="stHorizontalBlock"]:has([data-testid="stPlotlyChart"]) {{
+                flex-wrap: wrap !important;
+            }}
+            [data-testid="stHorizontalBlock"]:has([data-testid="stPlotlyChart"]) > [data-testid="stColumn"] {{
+                flex-basis: 100% !important;
+            }}
+
+            /* Eccezione: il gruppo esterno "stepper_row" (Carico | Reps |
+            RPE, o Round | Reps totali | Min/round | Carico tot.) resta
+            impilato verticalmente su schermi stretti - è già leggibile
+            così, ogni gruppo mostra comunque −/valore/+ compatto grazie
+            alla regola "stepper_inner" sotto. Selettore con ">" per
+            colpire SOLO la riga diretta di stepper_row (non quella, più
+            annidata, di stepper_inner al suo interno) - vedi
+            simple_stepper()/kg_stepper() in pages/2_Log_Giornaliero.py
+            per le chiavi "stepper_inner_*"/"stepper_row_*". */
+            [class*="st-key-stepper_row"] > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] {{
+                flex-wrap: wrap !important;
+            }}
+            [class*="st-key-stepper_row"] > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {{
+                flex-basis: 100% !important;
+            }}
+        }}
+        /* Riafferma il default (riga unica, nessun min-width) per il livello
+        stepper_inner annidato dentro stepper_row: stessa specificità della
+        regola dentro la media query sopra ma dichiarata dopo nel sorgente,
+        quindi vince per i suoi blocchi anche sotto i 600px. */
         [class*="st-key-stepper_inner"] [data-testid="stHorizontalBlock"] {{
             flex-direction: row !important;
             flex-wrap: nowrap !important;
         }}
         [class*="st-key-stepper_inner"] [data-testid="stColumn"] {{
             min-width: 0 !important;
+        }}
+
+        /* chip_selector: se le chip di una riga non ci stanno neppure
+        restringendosi al minimo (troppe opzioni o etichette lunghe),
+        scorrimento orizzontale invece di tornare a impilarsi o schiacciare
+        il testo. Vedi chip_selector() sotto per la chiave "chiprow_*". */
+        [class*="st-key-chiprow_"] > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] {{
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            flex-wrap: nowrap !important;
+        }}
+        [class*="st-key-chiprow_"] > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {{
+            flex: 0 0 auto !important;
+            min-width: fit-content !important;
+            width: auto !important;
         }}
         </style>
         """,
@@ -321,9 +396,12 @@ def styled_button(
     use_container_width: bool = True,
     disabled: bool = False,
     help: str | None = None,
+    wrap: bool = False,
 ) -> bool:
     """`st.button` recolored via the `st-key-<key>` class Streamlit attaches to
-    st.container(key=...). variant: "green" | "magenta" | "neutral-selected" | "neutral"."""
+    st.container(key=...). variant: "green" | "magenta" | "neutral-selected" | "neutral".
+    `wrap=True` per le etichette multi-riga (card titolo giorno/programma):
+    va a capo invece di troncare/traboccare su schermi stretti."""
     bg, color, border = {
         "green": (GREEN, ON_ACCENT, "none"),
         "magenta": (MAGENTA, ON_ACCENT, "none"),
@@ -331,11 +409,14 @@ def styled_button(
         "neutral": (SURFACE_HOVER, TEXT_PRIMARY, INTERACTIVE_BORDER),
     }[variant]
     css_key = _safe_key(key)
+    white_space = "normal" if wrap else "nowrap"
+    word_break = "overflow-wrap: break-word;" if wrap else ""
     st.markdown(
         f"""<style>.st-key-{css_key} button {{
             background: {bg} !important; color: {color} !important;
             border: 1px solid {border} !important;
-            white-space: nowrap !important;
+            white-space: {white_space} !important;
+            {word_break}
         }}</style>""",
         unsafe_allow_html=True,
     )
@@ -356,20 +437,28 @@ def chip_selector(options: list[tuple[str, str]], session_key: str, default: str
     selected = st.session_state[session_key]
     for i in range(0, len(options), per_row):
         riga = options[i : i + per_row]
-        cols = st.columns(len(riga))
-        for col, (value, label) in zip(cols, riga):
-            with col:
-                variant = "magenta" if value == selected else "neutral"
-                if styled_button(label, key=f"{session_key}_chip_{_safe_key(value)}", variant=variant):
-                    st.session_state[session_key] = value
-                    st.rerun()
+        # Chiave "chiprow_*" (vedi inject_global_css): se le chip non ci
+        # stanno neppure restringendosi al minimo, la riga scorre in
+        # orizzontale invece di impilarsi o schiacciare il testo.
+        with st.container(key=f"chiprow_{_safe_key(session_key)}_{i}"):
+            cols = st.columns(len(riga))
+            for col, (value, label) in zip(cols, riga):
+                with col:
+                    variant = "magenta" if value == selected else "neutral"
+                    if styled_button(label, key=f"{session_key}_chip_{_safe_key(value)}", variant=variant):
+                        st.session_state[session_key] = value
+                        st.rerun()
     return st.session_state[session_key]
 
 
-def text_button(label: str, key: str, use_container_width: bool = True) -> bool:
+def text_button(label: str, key: str, use_container_width: bool = True, wrap: bool = False) -> bool:
     """Bottone senza sfondo/bordo, sottolineatura tratteggiata: usato per il numero
-    del carico cliccabile che apre l'editing manuale."""
+    del carico cliccabile che apre l'editing manuale. `wrap=True` per le etichette
+    che possono superare la larghezza disponibile su schermi stretti (es. nome
+    programma + focus)."""
     css_key = _safe_key(key)
+    white_space = "normal" if wrap else "nowrap"
+    word_break = "overflow-wrap: break-word;" if wrap else ""
     st.markdown(
         f"""<style>.st-key-{css_key} button {{
             background: transparent !important;
@@ -378,6 +467,8 @@ def text_button(label: str, key: str, use_container_width: bool = True) -> bool:
             border-radius: 0 !important;
             color: {TEXT_PRIMARY} !important;
             font-family: {FONT_DISPLAY};
+            white-space: {white_space} !important;
+            {word_break}
         }}</style>""",
         unsafe_allow_html=True,
     )
