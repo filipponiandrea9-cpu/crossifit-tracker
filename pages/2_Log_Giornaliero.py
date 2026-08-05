@@ -17,6 +17,7 @@ from core.models import Log, LogEntry, Program, ProgramBlock, ProgramDay
 from core.theme import (
     FONT_DISPLAY,
     GREEN,
+    MAGENTA,
     PRIMARY_SECONDARY_RATIO,
     STEPPER_GROUP_GAP,
     STEPPER_INNER_GAP,
@@ -27,13 +28,12 @@ from core.theme import (
     chip_selector,
     icon_button,
     inject_global_css,
-    pill_html,
     popover_panel,
     progress_bar,
+    stepper_field_row,
     styled_button,
     subscreen_header,
     text_button,
-    type_badge_html,
 )
 from core.log_entries import get_or_create_log, salva_wod
 from core.wod_format import (
@@ -125,29 +125,6 @@ def save_sets(save_session, log_id: int, block_id, tipo: str, esercizio: str, ed
             )
         )
     return set_num
-
-
-def format_target_line(b: ProgramBlock) -> str:
-    parti = []
-    if b.tipo == "wod":
-        if b.nome_wod:
-            parti.append(b.nome_wod)
-        if b.schema_reps:
-            parti.append(b.schema_reps)
-        if b.formato_wod:
-            parti.append(b.formato_wod)
-        if b.durata_wod_min:
-            parti.append(f"{b.durata_wod_min:g} min")
-    else:
-        if b.schema_reps:
-            parti.append(b.schema_reps)
-        if b.target_carico_kg:
-            parti.append(f"{b.target_carico_kg:g}kg")
-        if b.target_percentuale:
-            parti.append(f"{b.target_percentuale:g}% 1RM")
-        if b.target_rpe:
-            parti.append(f"RPE {b.target_rpe:g}")
-    return " · ".join(parti) if parti else (b.note or "")
 
 
 def _sets_state_key(block_id, data_sessione: date) -> str:
@@ -299,6 +276,53 @@ def kg_stepper(sets_list: list, idx: int, key: str, step: float) -> None:
     )
 
 
+def _render_active_set_fields(sets: list, i: int, row_key: str, kg_step: float, reps_step: float, rpe_step: float) -> None:
+    """Carico e Reps sempre visibili (una riga per campo, label a sinistra +
+    stepper a destra - vedi stepper_field_row()); RPE nascosto dietro un tap
+    ("+ RPE") finché non serve, invece di un terzo stepper sempre presente.
+    Se l'ultima serie confermata dello stesso blocco aveva RPE valorizzato, la
+    riga RPE riparte già aperta (chi lo usa sempre non deve riaprirla ad ogni
+    set) - vedi design_handoff_layout1_log/README.md."""
+    s = sets[i]
+    stepper_field_row("Carico", f"{row_key}_kg", lambda: kg_stepper(sets, i, f"{row_key}_kg", kg_step))
+    stepper_field_row(
+        "Reps", f"{row_key}_reps",
+        lambda: simple_stepper(
+            s, "reps", f"{row_key}_reps", step=reps_step, min_value=0,
+            fmt=lambda v: str(int(v)) if v is not None else "—", label="reps", is_int=True,
+        ),
+    )
+
+    rpe_open_key = f"{row_key}_rpe_open"
+    if rpe_open_key not in st.session_state:
+        st.session_state[rpe_open_key] = i > 0 and sets[i - 1].get("rpe") is not None
+
+    if st.session_state[rpe_open_key]:
+        with st.container(key=f"fieldrow_{row_key}_rpe"):
+            col_label, col_stepper = st.columns([1, 3], gap="small")
+            with col_label:
+                if text_button("RPE ✕", key=f"{row_key}_rpe_close"):
+                    st.session_state[rpe_open_key] = False
+                    s["rpe"] = None
+                    st.rerun()
+                st.markdown(
+                    f"""<style>.st-key-{row_key}_rpe_close button {{
+                        font-size: 10.5px !important; color: {MAGENTA} !important;
+                        border-bottom-color: {MAGENTA} !important;
+                    }}</style>""",
+                    unsafe_allow_html=True,
+                )
+            with col_stepper:
+                simple_stepper(
+                    s, "rpe", f"{row_key}_rpe", step=rpe_step, min_value=1.0, max_value=10.0,
+                    fmt=lambda v: f"{v:g}" if v is not None else "—", label="RPE",
+                )
+    else:
+        if text_button("\\+ RPE", key=f"{row_key}_rpe_toggle"):
+            st.session_state[rpe_open_key] = True
+            st.rerun()
+
+
 def _riga_set_confermato(num: int, s: dict) -> str:
     kg_lbl = f"{s['carico_kg']:g}kg" if s.get("carico_kg") is not None else "—"
     reps_lbl = str(int(s["reps"])) if s.get("reps") is not None else "—"
@@ -329,32 +353,8 @@ def render_sets_card_body(blocco: ProgramBlock, prefix: str, existing_list: list
 
     if not tutti_confermati:
         i = primo_non_confermato
-        s = sets[i]
         row_key = f"{prefix}_set{i}"
-        with st.container(key=f"stepper_row_{row_key}_header"):
-            c_num, c_kg, c_reps, c_rpe = st.columns([0.5, 1.6, 1.6, 1.6], gap=STEPPER_GROUP_GAP)
-            with c_kg:
-                st.markdown('<div class="cft-mini-label">Carico</div>', unsafe_allow_html=True)
-            with c_reps:
-                st.markdown('<div class="cft-mini-label">Reps</div>', unsafe_allow_html=True)
-            with c_rpe:
-                st.markdown('<div class="cft-mini-label">RPE</div>', unsafe_allow_html=True)
-        with st.container(key=f"stepper_row_{row_key}"):
-            c_num, c_kg, c_reps, c_rpe = st.columns([0.5, 1.6, 1.6, 1.6], gap=STEPPER_GROUP_GAP)
-            with c_num:
-                st.markdown(f'<div class="cft-set-num">{i + 1}</div>', unsafe_allow_html=True)
-            with c_kg:
-                kg_stepper(sets, i, f"{row_key}_kg", kg_step)
-            with c_reps:
-                simple_stepper(
-                    s, "reps", f"{row_key}_reps", step=reps_step, min_value=0,
-                    fmt=lambda v: str(int(v)) if v is not None else "—", label="reps", is_int=True,
-                )
-            with c_rpe:
-                simple_stepper(
-                    s, "rpe", f"{row_key}_rpe", step=rpe_step, min_value=1.0, max_value=10.0,
-                    fmt=lambda v: f"{v:g}" if v is not None else "—", label="RPE",
-                )
+        _render_active_set_fields(sets, i, row_key, kg_step, reps_step, rpe_step)
         if styled_button(f"✓ Conferma set {i + 1}", key=f"{row_key}_confirm", variant="magenta"):
             if i + 1 < len(sets) and not sets[i + 1]["confermato"]:
                 # Propaga carico/RPE (non reps, che resta quello da schema) al set
@@ -370,7 +370,7 @@ def render_sets_card_body(blocco: ProgramBlock, prefix: str, existing_list: list
     if tutti_confermati:
         col_add, col_done = st.columns(PRIMARY_SECONDARY_RATIO)
         with col_add:
-            if styled_button("+ Aggiungi set", key=f"{prefix}_add"):
+            if styled_button("\\+ Aggiungi set", key=f"{prefix}_add"):
                 if sets:
                     ultimo_set = sets[-1]
                     sets.append({"carico_kg": ultimo_set["carico_kg"], "reps": ultimo_set["reps"], "rpe": ultimo_set["rpe"], "confermato": False})
@@ -407,8 +407,12 @@ def render_wod_card_body(blocco: Optional[ProgramBlock], prefix: str, existing_l
     else:
         formato_default = LIBERO
 
+    # per_row = tutte le opzioni in un'unica riga (chip formato + sotto-tipo
+    # unite): se non ci stanno neppure restringendosi al minimo, la riga
+    # scorre in orizzontale (meccanismo "chiprow_*" di chip_selector),
+    # invece di andare a capo su una seconda riga con margini propri.
     formato_options = [(f, FORMATO_CHIP_LABELS.get(f, f)) for f in WOD_FORMATS]
-    formato = chip_selector(formato_options, session_key=f"{prefix}_formato_sel", default=formato_default, per_row=3)
+    formato = chip_selector(formato_options, session_key=f"{prefix}_formato_sel", default=formato_default, per_row=len(formato_options))
     campi = campi_visibili(formato)
 
     kg_step = st.session_state.get("kg_step", 2.5)
@@ -431,55 +435,62 @@ def render_wod_card_body(blocco: Optional[ProgramBlock], prefix: str, existing_l
     campi_da_mostrare = [
         c for c in ("tempo", "round", "reps_extra", "reps_totali", "emom_minuti", "carico_totale") if c in campi
     ]
-    if campi_da_mostrare:
-        with st.container(key=f"stepper_row_{prefix}_wod"):
-            cols = st.columns(len(campi_da_mostrare), gap=STEPPER_GROUP_GAP)
-            for col, campo in zip(cols, campi_da_mostrare):
-                with col:
-                    if campo == "tempo":
-                        st.markdown('<div class="cft-mini-label">Tempo (min : sec)</div>', unsafe_allow_html=True)
-                        cm, cs = st.columns(2, gap=STEPPER_INNER_GAP)
-                        with cm:
-                            simple_stepper(
-                                wstate, "tempo_min", f"{prefix}_min", step=1, min_value=0,
-                                fmt=lambda v: f"{int(v):02d}", label="minuti", is_int=True,
-                            )
-                        with cs:
-                            simple_stepper(
-                                wstate, "tempo_sec", f"{prefix}_sec", step=1, min_value=0, max_value=59,
-                                fmt=lambda v: f"{int(v):02d}", label="secondi", is_int=True,
-                            )
-                    elif campo == "round":
-                        etichetta = "Round / intervallo" if formato == "EMOM" else "Round completati"
-                        st.markdown(f'<div class="cft-mini-label">{etichetta}</div>', unsafe_allow_html=True)
-                        simple_stepper(
-                            wstate, "round", f"{prefix}_round", step=1, min_value=0, fmt=lambda v: str(int(v)),
-                            label="round", is_int=True,
-                        )
-                    elif campo == "reps_extra":
-                        st.markdown('<div class="cft-mini-label">Reps extra</div>', unsafe_allow_html=True)
-                        simple_stepper(
-                            wstate, "reps_extra", f"{prefix}_repsextra", step=1, min_value=0, fmt=lambda v: str(int(v)),
-                            label="reps extra", is_int=True,
-                        )
-                    elif campo == "reps_totali":
-                        st.markdown('<div class="cft-mini-label">Reps totali</div>', unsafe_allow_html=True)
-                        simple_stepper(
-                            wstate, "reps_totali", f"{prefix}_repstot", step=1, min_value=0, fmt=lambda v: str(int(v)),
-                            label="reps totali", is_int=True,
-                        )
-                    elif campo == "emom_minuti":
-                        st.markdown('<div class="cft-mini-label">Min / round</div>', unsafe_allow_html=True)
-                        simple_stepper(
-                            wstate, "emom_minuti", f"{prefix}_emom", step=0.5, min_value=0.5, fmt=lambda v: f"{v:g}",
-                            label="minuti per round",
-                        )
-                    elif campo == "carico_totale":
-                        st.markdown('<div class="cft-mini-label">Carico tot. (kg)</div>', unsafe_allow_html=True)
-                        simple_stepper(
-                            wstate, "carico_totale", f"{prefix}_caricotot", step=kg_step, min_value=0.0, fmt=lambda v: f"{v:g}",
-                            label="carico totale",
-                        )
+    for campo in campi_da_mostrare:
+        if campo == "tempo":
+            def _render_tempo() -> None:
+                cm, cs = st.columns(2, gap=STEPPER_INNER_GAP)
+                with cm:
+                    simple_stepper(
+                        wstate, "tempo_min", f"{prefix}_min", step=1, min_value=0,
+                        fmt=lambda v: f"{int(v):02d}", label="minuti", is_int=True,
+                    )
+                with cs:
+                    simple_stepper(
+                        wstate, "tempo_sec", f"{prefix}_sec", step=1, min_value=0, max_value=59,
+                        fmt=lambda v: f"{int(v):02d}", label="secondi", is_int=True,
+                    )
+            stepper_field_row("Tempo (min:sec)", f"{prefix}_tempo", _render_tempo)
+        elif campo == "round":
+            etichetta = "Round / intervallo" if formato == "EMOM" else "Round completati"
+            stepper_field_row(
+                etichetta, f"{prefix}_round",
+                lambda: simple_stepper(
+                    wstate, "round", f"{prefix}_round", step=1, min_value=0, fmt=lambda v: str(int(v)),
+                    label="round", is_int=True,
+                ),
+            )
+        elif campo == "reps_extra":
+            stepper_field_row(
+                "Reps extra", f"{prefix}_repsextra",
+                lambda: simple_stepper(
+                    wstate, "reps_extra", f"{prefix}_repsextra", step=1, min_value=0, fmt=lambda v: str(int(v)),
+                    label="reps extra", is_int=True,
+                ),
+            )
+        elif campo == "reps_totali":
+            stepper_field_row(
+                "Reps totali", f"{prefix}_repstot",
+                lambda: simple_stepper(
+                    wstate, "reps_totali", f"{prefix}_repstot", step=1, min_value=0, fmt=lambda v: str(int(v)),
+                    label="reps totali", is_int=True,
+                ),
+            )
+        elif campo == "emom_minuti":
+            stepper_field_row(
+                "Min / round", f"{prefix}_emom",
+                lambda: simple_stepper(
+                    wstate, "emom_minuti", f"{prefix}_emom", step=0.5, min_value=0.5, fmt=lambda v: f"{v:g}",
+                    label="minuti per round",
+                ),
+            )
+        elif campo == "carico_totale":
+            stepper_field_row(
+                "Carico tot. (kg)", f"{prefix}_caricotot",
+                lambda: simple_stepper(
+                    wstate, "carico_totale", f"{prefix}_caricotot", step=kg_step, min_value=0.0, fmt=lambda v: f"{v:g}",
+                    label="carico totale",
+                ),
+            )
 
     splits_json = existing.splits_json if existing else None
     if formato == FOR_TIME:
@@ -506,11 +517,35 @@ def render_wod_card_body(blocco: Optional[ProgramBlock], prefix: str, existing_l
                         sp, "time_sec", f"{row_key}_time", step=5, min_value=0,
                         fmt=lambda v: f"{int(v) // 60}:{int(v) % 60:02d}", label="tempo parziale", is_int=True,
                     )
-        if styled_button("+ Aggiungi parziale", key=f"{prefix}_addsplit"):
+        if styled_button("\\+ Aggiungi parziale", key=f"{prefix}_addsplit"):
             splits.append({"label": "", "time_sec": 0})
         splits_json = serialize_splits(splits)
 
-    note = st.text_area("Note", key=f"{prefix}_note", value=(existing.note if existing and existing.note else ""))
+    # Note collassata dietro "+ Aggiungi nota": di default non occupa spazio
+    # (usata in una minoranza dei set), parte già aperta solo se sta
+    # modificando un blocco che ha già una nota non vuota - vedi
+    # design_handoff_layout1_log/README.md.
+    existing_note = existing.note if existing and existing.note else ""
+    note_key = f"{prefix}_note"
+    note_open_key = f"{prefix}_note_open"
+    st.session_state.setdefault(note_open_key, bool(existing_note.strip()))
+
+    if st.session_state[note_open_key]:
+        col_note_label, col_note_close = st.columns([5, 1])
+        with col_note_label:
+            st.markdown('<div class="cft-mini-label" style="text-align:left; margin-top:8px;">Note</div>', unsafe_allow_html=True)
+        with col_note_close:
+            if text_button("✕", key=f"{prefix}_note_close"):
+                st.session_state[note_open_key] = False
+                st.rerun()
+        note = st.text_area(
+            "Note", key=note_key, value=existing_note, height=68, label_visibility="collapsed",
+        )
+    else:
+        note = st.session_state.get(note_key, existing_note)
+        if text_button("\\+ Aggiungi nota", key=f"{prefix}_note_toggle"):
+            st.session_state[note_open_key] = True
+            st.rerun()
 
     label = "💾 Salva modifiche" if done else "✓ Segna come fatto"
     if styled_button(label, key=f"{prefix}_done", variant="green"):
@@ -557,28 +592,27 @@ def render_block_card(blocco: ProgramBlock, data_sessione: date, giorno_id, exis
     )
 
     with st.container(key=card_key, border=True):
-        col_badge, col_main, col_status = st.columns([1, 5, 2])
-        with col_badge:
-            st.markdown(type_badge_html(TYPE_BADGE.get(blocco.tipo, blocco.tipo.upper()[:3])), unsafe_allow_html=True)
-        with col_main:
-            st.markdown(
-                f'<div style="font-weight:600; font-size:15px;">{blocco.esercizio}</div>'
-                f'<div style="color:{TEXT_SECONDARY}; font-size:12.5px; margin-top:1px;">{format_target_line(blocco)}</div>',
-                unsafe_allow_html=True,
-            )
-        with col_status:
-            st.markdown(pill_html("✓ Fatto" if done else "● Da fare", done), unsafe_allow_html=True)
-
-        if text_button("🔍 Confronta storico", key=f"cerca_storico_{blocco.id}", use_container_width=False):
-            st.session_state["storico_search_query"] = blocco.esercizio
-            st.switch_page("pages/3_Storico_Progressi.py")
-
         show_body = st.session_state.get("log_active_block") == blocco.id
-        if st.button("Chiudi ▴" if show_body else "Dettagli ▾", key=f"toggle_{blocco.id}", use_container_width=True):
+        badge = TYPE_BADGE.get(blocco.tipo, blocco.tipo.upper()[:3])
+        stato = "✓ Fatto" if done else "● Da fare"
+        chevron = "︿" if show_body else "⌄"
+        # Card collassata = una riga sola, l'intera riga è cliccabile: un solo
+        # styled_button (variant="row", trasparente) sostituisce sia la vecchia
+        # riga info (badge/nome/stato) sia il vecchio bottone separato
+        # "Dettagli ▾"/"Chiudi ▴" - vedi design_handoff_layout1_log/README.md.
+        # Streamlit non supporta HTML dentro st.button: badge/stato restano
+        # testo semplice (niente pillola colorata), **nome** in grassetto via
+        # markdown per dare comunque peso visivo variabile nome-vs-resto.
+        riga_label = f"{badge}  ·  **{blocco.esercizio}**  ·  {stato}  {chevron}"
+        if styled_button(riga_label, key=f"{card_key}_row", variant="row", use_container_width=True, wrap=True):
             st.session_state["log_active_block"] = None if show_body else blocco.id
             st.rerun()
 
         if show_body:
+            if text_button("🔍 Confronta storico", key=f"cerca_storico_{blocco.id}", use_container_width=False):
+                st.session_state["storico_search_query"] = blocco.esercizio
+                st.switch_page("pages/3_Storico_Progressi.py")
+
             prefix = f"block_{blocco.id}_{data_sessione.isoformat()}"
             if blocco.tipo in ("strength", "complex"):
                 render_sets_card_body(blocco, prefix, existing_list, data_sessione, giorno_id, done)
@@ -604,32 +638,8 @@ def render_sets_card_body_libero(prefix: str, data_sessione: date, giorno_id, ti
 
     if not tutti_confermati:
         i = primo_non_confermato
-        s = sets[i]
         row_key = f"{prefix}_set{i}"
-        with st.container(key=f"stepper_row_{row_key}_header"):
-            c_num, c_kg, c_reps, c_rpe = st.columns([0.5, 1.6, 1.6, 1.6], gap=STEPPER_GROUP_GAP)
-            with c_kg:
-                st.markdown('<div class="cft-mini-label">Carico</div>', unsafe_allow_html=True)
-            with c_reps:
-                st.markdown('<div class="cft-mini-label">Reps</div>', unsafe_allow_html=True)
-            with c_rpe:
-                st.markdown('<div class="cft-mini-label">RPE</div>', unsafe_allow_html=True)
-        with st.container(key=f"stepper_row_{row_key}"):
-            c_num, c_kg, c_reps, c_rpe = st.columns([0.5, 1.6, 1.6, 1.6], gap=STEPPER_GROUP_GAP)
-            with c_num:
-                st.markdown(f'<div class="cft-set-num">{i + 1}</div>', unsafe_allow_html=True)
-            with c_kg:
-                kg_stepper(sets, i, f"{row_key}_kg", kg_step)
-            with c_reps:
-                simple_stepper(
-                    s, "reps", f"{row_key}_reps", step=reps_step, min_value=0,
-                    fmt=lambda v: str(int(v)) if v is not None else "—", label="reps", is_int=True,
-                )
-            with c_rpe:
-                simple_stepper(
-                    s, "rpe", f"{row_key}_rpe", step=rpe_step, min_value=1.0, max_value=10.0,
-                    fmt=lambda v: f"{v:g}" if v is not None else "—", label="RPE",
-                )
+        _render_active_set_fields(sets, i, row_key, kg_step, reps_step, rpe_step)
         if styled_button(f"✓ Conferma set {i + 1}", key=f"{row_key}_confirm", variant="magenta"):
             if i + 1 < len(sets) and not sets[i + 1]["confermato"]:
                 if sets[i + 1]["carico_kg"] is None:
@@ -642,7 +652,7 @@ def render_sets_card_body_libero(prefix: str, data_sessione: date, giorno_id, ti
     if tutti_confermati:
         col_add, col_done = st.columns(PRIMARY_SECONDARY_RATIO)
         with col_add:
-            if styled_button("+ Aggiungi set", key=f"{prefix}_add"):
+            if styled_button("\\+ Aggiungi set", key=f"{prefix}_add"):
                 if sets:
                     ultimo_set = sets[-1]
                     sets.append({"carico_kg": ultimo_set["carico_kg"], "reps": ultimo_set["reps"], "rpe": ultimo_set["rpe"], "confermato": False})
@@ -681,14 +691,10 @@ def render_free_entry_card(data_sessione: date, giorno_id) -> None:
         unsafe_allow_html=True,
     )
     with st.container(key=card_key, border=True):
-        col_badge, col_main = st.columns([1, 8])
-        with col_badge:
-            st.markdown(type_badge_html("LIBERO"), unsafe_allow_html=True)
-        with col_main:
-            st.markdown('<div style="font-weight:600; font-size:15px;">Aggiungi voce senza piano</div>', unsafe_allow_html=True)
-
         show_body = st.session_state.get("log_active_block") == "libero"
-        if st.button("Chiudi ▴" if show_body else "Dettagli ▾", key="toggle_libero", use_container_width=True):
+        chevron = "︿" if show_body else "⌄"
+        riga_label = f"LIBERO  ·  **Aggiungi voce senza piano**  {chevron}"
+        if styled_button(riga_label, key=f"{card_key}_row", variant="row", use_container_width=True, wrap=True):
             st.session_state["log_active_block"] = None if show_body else "libero"
             st.rerun()
 
@@ -900,29 +906,53 @@ else:
 
             blocchi_ids = [b.id for b in _carica_blocchi(giorno_selezionato_id)]
 
-    # Riga 1 — titolo + sottotitolo programma (cliccabile solo con >1 programma;
-    # con un solo programma è già la scelta implicita, niente popover).
-    col_title, col_menu = st.columns([5, 1])
-    with col_title:
-        st.markdown("## Log")
-        if programmi:
-            nome_prog_corrente = next((p.nome_mese for p in programmi if p.id == programma_id), programmi[0].nome_mese)
-            focus_suffix = f" · {focus_corrente}" if focus_corrente else ""
-            if len(programmi) > 1:
-                if text_button(f"**{nome_prog_corrente}**{focus_suffix}  ⌄", key="log_program_subtitle", wrap=True):
-                    st.session_state["log_program_popover_open"] = not st.session_state.get("log_program_popover_open", False)
+    # Sottotitolo programma (cliccabile solo con >1 programma; con un solo
+    # programma è già la scelta implicita, niente popover) - riga propria
+    # sopra l'header compatto, per non appesantire quest'ultimo quando in
+    # gioco c'è la scelta fra più piani importati.
+    if programmi and len(programmi) > 1:
+        nome_prog_corrente = next((p.nome_mese for p in programmi if p.id == programma_id), programmi[0].nome_mese)
+        focus_suffix = f" · {focus_corrente}" if focus_corrente else ""
+        if text_button(f"**{nome_prog_corrente}**{focus_suffix}  ⌄", key="log_program_subtitle", wrap=True):
+            st.session_state["log_program_popover_open"] = not st.session_state.get("log_program_popover_open", False)
+            st.rerun()
+
+    # Data di log e numeri di avanzamento calcolati PRIMA di disegnare
+    # l'header: cosi' la barra di progresso puo' stare nello stesso gruppo
+    # visivo del titolo (st.container(gap=None) sotto, niente margine
+    # Streamlit fra i due) invece che ricaricata più in basso dopo la riga
+    # data-nav - vedi design_handoff_layout1_log/README.md, punto 1.
+    st.session_state.setdefault("log_data_sessione", date.today())
+    data_sessione = st.session_state["log_data_sessione"]
+
+    blocchi: list = []
+    entries_per_blocco: dict = {}
+    blocchi_fatti = 0
+    if usa_piano and giorno_selezionato_id and blocchi_ids:
+        blocchi = _carica_blocchi(giorno_selezionato_id)
+        entries_per_blocco = _carica_entries_per_blocco(giorno_selezionato_id, data_sessione)
+        blocchi_fatti = sum(1 for b in blocchi if entries_per_blocco.get(b.id))
+
+    # Header compatto: titolo giorno (cliccabile, apre lo stesso popover
+    # settimana/giorno di prima) + icona "⋯" su una riga, barra di
+    # avanzamento incorporata subito sotto senza gap Streamlit fra i due.
+    with st.container(gap=None):
+        col_title, col_menu = st.columns([5, 1])
+        with col_title:
+            if usa_piano and giorni_programma:
+                titolo_riga = f"**Sett. {settimana_corrente} · {giorno_label_corrente}**  ⌄"
+                label = f"{titolo_riga}  \n{focus_corrente}" if focus_corrente else titolo_riga
+                if text_button(label, key="log_title_daynav", wrap=True):
+                    st.session_state["log_daynav_popover_open"] = not st.session_state.get("log_daynav_popover_open", False)
                     st.rerun()
             else:
-                st.markdown(
-                    f'<div style="font-size:13px; margin-top:4px;">'
-                    f'<span style="color:{TEXT_PRIMARY}; font-weight:700;">{nome_prog_corrente}</span>'
-                    f'<span style="color:{TEXT_SECONDARY};">{focus_suffix}</span></div>',
-                    unsafe_allow_html=True,
-                )
-    with col_menu:
-        if icon_button("⋯", key="log_menu_icon", active=st.session_state.get("log_menu_open", False), help="Altre opzioni"):
-            st.session_state["log_menu_open"] = not st.session_state.get("log_menu_open", False)
-            st.rerun()
+                st.markdown("**Log**")
+        with col_menu:
+            if icon_button("⋯", key="log_menu_icon", active=st.session_state.get("log_menu_open", False), help="Altre opzioni"):
+                st.session_state["log_menu_open"] = not st.session_state.get("log_menu_open", False)
+                st.rerun()
+        if blocchi:
+            progress_bar(blocchi_fatti, len(blocchi), f"{blocchi_fatti}/{len(blocchi)} blocchi")
 
     if st.session_state.get("log_menu_open"):
         with popover_panel("log_menu_panel"):
@@ -950,46 +980,34 @@ else:
             opzioni_prog = [(n, f"{n}  ✓" if n == corrente else n) for n in nomi_programmi]
             chip_selector(opzioni_prog, session_key="log_programma_select", per_row=1)
 
-    # Riga 2 — card Settimana/Giorno: cliccabile, apre un popover con due righe
-    # di chip al posto delle vecchie due st.selectbox.
-    if usa_piano and giorni_programma:
-        titolo_card = f"Sett. {settimana_corrente} · {giorno_label_corrente}"
-        sottotitolo_card = f"{focus_corrente} — tocca per cambiare" if focus_corrente else "Tocca per cambiare"
-        if styled_button(f"**{titolo_card}**  \n{sottotitolo_card}  ⌄", key="log_daynav_card", variant="neutral", wrap=True):
-            st.session_state["log_daynav_popover_open"] = not st.session_state.get("log_daynav_popover_open", False)
-            st.rerun()
+    if usa_piano and giorni_programma and st.session_state.get("log_daynav_popover_open"):
+        with popover_panel("log_daynav_popover"):
+            st.markdown('<div class="cft-mini-label" style="text-align:left; margin-bottom:2px;">Settimana</div>', unsafe_allow_html=True)
+            chip_selector(
+                [(s, s) for s in settimane_str], session_key="log_settimana_select",
+                default=str(settimana_scelta), per_row=min(len(settimane_str), 6) or 1,
+            )
 
-        if st.session_state.get("log_daynav_popover_open"):
-            with popover_panel("log_daynav_popover"):
-                st.markdown('<div class="cft-mini-label" style="text-align:left; margin-bottom:2px;">Settimana</div>', unsafe_allow_html=True)
-                chip_selector(
-                    [(s, s) for s in settimane_str], session_key="log_settimana_select",
-                    default=str(settimana_scelta), per_row=min(len(settimane_str), 6) or 1,
-                )
+            st.markdown(
+                '<div class="cft-mini-label" style="text-align:left; margin-bottom:2px; margin-top:10px;">Allenamento</div>',
+                unsafe_allow_html=True,
+            )
+            # Riga giorno costruita a mano (non chip_selector) solo perché
+            # qui, a differenza della settimana, la scelta deve anche
+            # chiudere il popover subito - chip_selector fa già il suo
+            # st.rerun() interno appena cliccato, quindi non c'è modo di
+            # aggiungere quella chiusura *dopo* averlo chiamato.
+            cols_giorno = st.columns(min(len(labels), 4) or 1)
+            for i, lab in enumerate(labels):
+                with cols_giorno[i % len(cols_giorno)]:
+                    variant = "magenta" if lab == label_scelta else "neutral"
+                    if styled_button(lab, key=f"log_daynav_giorno_{i}", variant=variant):
+                        st.session_state["log_giorno_select"] = lab
+                        st.session_state["log_daynav_popover_open"] = False
+                        st.rerun()
 
-                st.markdown(
-                    '<div class="cft-mini-label" style="text-align:left; margin-bottom:2px; margin-top:10px;">Allenamento</div>',
-                    unsafe_allow_html=True,
-                )
-                # Riga giorno costruita a mano (non chip_selector) solo perché
-                # qui, a differenza della settimana, la scelta deve anche
-                # chiudere il popover subito - chip_selector fa già il suo
-                # st.rerun() interno appena cliccato, quindi non c'è modo di
-                # aggiungere quella chiusura *dopo* averlo chiamato.
-                cols_giorno = st.columns(min(len(labels), 4) or 1)
-                for i, lab in enumerate(labels):
-                    with cols_giorno[i % len(cols_giorno)]:
-                        variant = "magenta" if lab == label_scelta else "neutral"
-                        if styled_button(lab, key=f"log_daynav_giorno_{i}", variant=variant):
-                            st.session_state["log_giorno_select"] = lab
-                            st.session_state["log_daynav_popover_open"] = False
-                            st.rerun()
-
-    # Riga 3 — data di log: sposta data_sessione ± 1 giorno, indipendente dal
-    # giorno di piano scelto in Riga 2 (per questo è una riga separata).
-    st.session_state.setdefault("log_data_sessione", date.today())
-    data_sessione = st.session_state["log_data_sessione"]
-
+    # Riga data-nav: sposta data_sessione ± 1 giorno, indipendente dal giorno
+    # di piano scelto sopra (per questo è una riga separata, invariata).
     col_data_label, col_data_stepper, col_cal = st.columns([1.3, 4.4, 0.9])
     with col_data_label:
         st.markdown(f'<div style="color:{TEXT_TERTIARY}; font-size:11px; padding-top:9px;">Data log</div>', unsafe_allow_html=True)
@@ -1019,16 +1037,16 @@ else:
     if st.session_state.get("log_cal_open"):
         nuova_data = st.date_input("Data", value=data_sessione, key="log_date_input_hidden")
         if nuova_data != data_sessione:
+            # rerun esplicito (non solo assegnazione locale) perché qui, a
+            # differenza di come lavorava questo stesso blocco prima che i
+            # numeri di avanzamento venissero precaricati sopra la riga
+            # data-nav, blocchi/entries_per_blocco/progress bar sono già
+            # stati letti PRIMA di questo punto: senza un rerun resterebbero
+            # calcolati sulla data vecchia per l'intero giro di rendering.
             st.session_state["log_data_sessione"] = nuova_data
-            data_sessione = nuova_data
+            st.rerun()
 
     if usa_piano and giorno_selezionato_id and blocchi_ids:
-        blocchi = _carica_blocchi(giorno_selezionato_id)
-        entries_per_blocco = _carica_entries_per_blocco(giorno_selezionato_id, data_sessione)
-
-        blocchi_fatti = sum(1 for b in blocchi if entries_per_blocco.get(b.id))
-        progress_bar(blocchi_fatti, len(blocchi), f"{blocchi_fatti}/{len(blocchi)} blocchi")
-
         ids_del_giorno = {b.id for b in blocchi}
         attivo = st.session_state.get("log_active_block")
         if attivo not in ids_del_giorno and attivo != "libero":

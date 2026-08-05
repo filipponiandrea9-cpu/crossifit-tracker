@@ -9,6 +9,7 @@ duplicating markup.
 from __future__ import annotations
 
 import re
+from typing import Callable
 
 import streamlit as st
 
@@ -285,6 +286,15 @@ def inject_global_css() -> None:
             text-align: center;
             margin-bottom: 2px;
         }}
+        /* Label a sinistra di stepper_field_row() (Carico/Reps/RPE, campi
+        WOD): sostituisce la mini-label sopra lo stepper con una riga sola
+        "label + stepper" - vedi design_handoff_layout1_log/README.md. */
+        .cft-field-label {{
+            font-size: 10.5px;
+            color: {TEXT_SECONDARY};
+            font-weight: 600;
+            padding-top: 6px;
+        }}
 
         /* Centra verticalmente (flexbox align-items:center) i bottoni −/+ e il
         valore sulla stessa riga, sia per il gruppo singolo (−/valore/+) sia per
@@ -379,6 +389,17 @@ def inject_global_css() -> None:
             min-width: fit-content !important;
             width: auto !important;
         }}
+
+        /* stepper_field_row(): riga "label a sinistra + stepper a destra"
+        (Carico/Reps/RPE, campi WOD) - margine ridotto tra le righe impilate
+        invece del gap Streamlit di default, e centratura verticale label/
+        stepper sulla stessa riga. */
+        [class*="st-key-fieldrow_"] {{
+            margin-bottom: 6px;
+        }}
+        [class*="st-key-fieldrow_"] [data-testid="stHorizontalBlock"] {{
+            align-items: center !important;
+        }}
         </style>
         """,
         unsafe_allow_html=True,
@@ -399,23 +420,30 @@ def styled_button(
     wrap: bool = False,
 ) -> bool:
     """`st.button` recolored via the `st-key-<key>` class Streamlit attaches to
-    st.container(key=...). variant: "green" | "magenta" | "neutral-selected" | "neutral".
-    `wrap=True` per le etichette multi-riga (card titolo giorno/programma):
-    va a capo invece di troncare/traboccare su schermi stretti."""
+    st.container(key=...). variant: "green" | "magenta" | "neutral-selected" | "neutral" | "row".
+    "row" = trasparente, senza bordo, testo allineato a sinistra: per le
+    card-riga cliccabili (blocco Log) che devono sembrare testo dentro un
+    contenitore già bordato/colorato dal chiamante, non un bottone a sé.
+    `wrap=True` per le etichette multi-riga (card titolo giorno/programma,
+    card-riga blocco): va a capo invece di troncare/traboccare su schermi
+    stretti."""
     bg, color, border = {
         "green": (GREEN, ON_ACCENT, "none"),
         "magenta": (MAGENTA, ON_ACCENT, "none"),
         "neutral-selected": (SURFACE_HOVER_2, TEXT_PRIMARY, INTERACTIVE_BORDER),
         "neutral": (SURFACE_HOVER, TEXT_PRIMARY, INTERACTIVE_BORDER),
+        "row": ("transparent", TEXT_PRIMARY, "none"),
     }[variant]
     css_key = _safe_key(key)
     white_space = "normal" if wrap else "nowrap"
     word_break = "overflow-wrap: break-word;" if wrap else ""
+    text_align = "left" if variant == "row" else "center"
     st.markdown(
         f"""<style>.st-key-{css_key} button {{
             background: {bg} !important; color: {color} !important;
             border: 1px solid {border} !important;
             white-space: {white_space} !important;
+            text-align: {text_align} !important;
             {word_break}
         }}</style>""",
         unsafe_allow_html=True,
@@ -449,6 +477,23 @@ def chip_selector(options: list[tuple[str, str]], session_key: str, default: str
                         st.session_state[session_key] = value
                         st.rerun()
     return st.session_state[session_key]
+
+
+def stepper_field_row(field_label: str, key: str, render_fn: Callable[[], None]) -> None:
+    """Riga "label a sinistra + stepper a destra" (`st.columns([1, 3])`)
+    invece della mini-label sopra + riga stepper sotto: usata per Carico/Reps/
+    RPE nei set forza/complex e per i campi numerici WOD (Round, Reps totali,
+    Min/round, Carico tot., Tempo) - vedi
+    design_handoff_layout1_log/README.md. `render_fn` disegna lo stepper
+    (chiamata a simple_stepper()/kg_stepper(), o una combinazione per campi
+    doppi come Tempo min:sec) nella colonna destra. Chiave "fieldrow_*": vedi
+    inject_global_css() per il margine ridotto tra righe impilate."""
+    with st.container(key=f"fieldrow_{_safe_key(key)}"):
+        col_label, col_stepper = st.columns([1, 3], gap="small")
+        with col_label:
+            st.markdown(f'<div class="cft-field-label">{field_label}</div>', unsafe_allow_html=True)
+        with col_stepper:
+            render_fn()
 
 
 def text_button(label: str, key: str, use_container_width: bool = True, wrap: bool = False) -> bool:
