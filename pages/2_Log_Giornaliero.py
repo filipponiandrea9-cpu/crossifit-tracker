@@ -954,6 +954,32 @@ else:
             st.session_state["log_program_popover_open"] = not st.session_state.get("log_program_popover_open", False)
             st.rerun()
 
+    if len(programmi) > 1 and st.session_state.get("log_program_popover_open"):
+        with popover_panel("log_program_popover"):
+            # Il toggle "piano/libero" si sposta qui (assieme alla scelta
+            # programma) invece di stare sempre visibile in cima.
+            # value=usa_piano esplicito: il widget e' montato solo quando il
+            # popover e' aperto (condizionale), e al primissimo mount NON
+            # rifletteva session_state pre-impostato da setdefault() sopra -
+            # restava graficamente su "off" anche a usa_piano=True finche' non
+            # veniva toccato una volta (bug di visualizzazione, verificato).
+            st.toggle("Collega a un allenamento pianificato", value=usa_piano, key="log_usa_piano_toggle")
+            nomi_programmi = [p.nome_mese for p in programmi]
+            corrente = st.session_state.get("log_programma_select", nomi_programmi[0])
+            # Riga programma costruita a mano (non chip_selector) solo perché
+            # qui la scelta deve anche chiudere il popover subito -
+            # chip_selector fa già il suo st.rerun() interno appena cliccato,
+            # quindi non c'è modo di aggiungere quella chiusura *dopo* averlo
+            # chiamato (stesso motivo del picker "Allenamento" più sotto).
+            cols_prog = st.columns(min(len(nomi_programmi), 3) or 1)
+            for i, nome in enumerate(nomi_programmi):
+                with cols_prog[i % len(cols_prog)]:
+                    variant = "magenta" if nome == corrente else "neutral"
+                    if styled_button(nome, key=f"log_program_pick_{i}", variant=variant, wrap=True):
+                        st.session_state["log_programma_select"] = nome
+                        st.session_state["log_program_popover_open"] = False
+                        st.rerun()
+
     # Data di log e numeri di avanzamento calcolati PRIMA di disegnare
     # l'header: cosi' la barra di progresso puo' stare nello stesso gruppo
     # visivo del titolo (st.container(gap=None) sotto, niente margine
@@ -1001,21 +1027,6 @@ else:
                 st.session_state["log_screen"] = "settings"
                 st.session_state["log_menu_open"] = False
                 st.rerun()
-
-    if len(programmi) > 1 and st.session_state.get("log_program_popover_open"):
-        with popover_panel("log_program_popover"):
-            # Il toggle "piano/libero" si sposta qui (assieme alla scelta
-            # programma) invece di stare sempre visibile in cima.
-            # value=usa_piano esplicito: il widget e' montato solo quando il
-            # popover e' aperto (condizionale), e al primissimo mount NON
-            # rifletteva session_state pre-impostato da setdefault() sopra -
-            # restava graficamente su "off" anche a usa_piano=True finche' non
-            # veniva toccato una volta (bug di visualizzazione, verificato).
-            st.toggle("Collega a un allenamento pianificato", value=usa_piano, key="log_usa_piano_toggle")
-            nomi_programmi = [p.nome_mese for p in programmi]
-            corrente = st.session_state.get("log_programma_select", nomi_programmi[0])
-            opzioni_prog = [(n, f"{n}  ✓" if n == corrente else n) for n in nomi_programmi]
-            chip_selector(opzioni_prog, session_key="log_programma_select", per_row=1)
 
     if usa_piano and giorni_programma and st.session_state.get("log_daynav_popover_open"):
         with popover_panel("log_daynav_popover"):
