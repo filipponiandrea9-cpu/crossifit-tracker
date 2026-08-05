@@ -578,6 +578,33 @@ def render_wod_card_body(blocco: Optional[ProgramBlock], prefix: str, existing_l
             st.rerun()
 
 
+def format_target_line(b: ProgramBlock) -> str:
+    """Dettaglio target del blocco così come scritto nel programma importato
+    (schema reps/carico/%1RM/RPE per forza/complex, nome/formato/durata per i
+    WOD) - fedele all'originale, nessun accorciamento. Usato nella card
+    collassata (render_block_card) subito dopo il nome esercizio."""
+    parti = []
+    if b.tipo == "wod":
+        if b.nome_wod:
+            parti.append(b.nome_wod)
+        if b.schema_reps:
+            parti.append(b.schema_reps)
+        if b.formato_wod:
+            parti.append(b.formato_wod)
+        if b.durata_wod_min:
+            parti.append(f"{b.durata_wod_min:g} min")
+    else:
+        if b.schema_reps:
+            parti.append(b.schema_reps)
+        if b.target_carico_kg:
+            parti.append(f"{b.target_carico_kg:g}kg")
+        if b.target_percentuale:
+            parti.append(f"{b.target_percentuale:g}% 1RM")
+        if b.target_rpe:
+            parti.append(f"RPE {b.target_rpe:g}")
+    return " · ".join(parti) if parti else (b.note or "")
+
+
 def render_block_card(blocco: ProgramBlock, data_sessione: date, giorno_id, existing_list: list) -> None:
     done = bool(existing_list)
     card_key = f"card_{blocco.id}"
@@ -596,6 +623,7 @@ def render_block_card(blocco: ProgramBlock, data_sessione: date, giorno_id, exis
         badge = TYPE_BADGE.get(blocco.tipo, blocco.tipo.upper()[:3])
         stato = "✓ Fatto" if done else "● Da fare"
         chevron = "︿" if show_body else "⌄"
+        dettaglio = format_target_line(blocco)
         # Card collassata = una riga sola, l'intera riga è cliccabile: un solo
         # styled_button (variant="row", trasparente) sostituisce sia la vecchia
         # riga info (badge/nome/stato) sia il vecchio bottone separato
@@ -603,7 +631,16 @@ def render_block_card(blocco: ProgramBlock, data_sessione: date, giorno_id, exis
         # Streamlit non supporta HTML dentro st.button: badge/stato restano
         # testo semplice (niente pillola colorata), **nome** in grassetto via
         # markdown per dare comunque peso visivo variabile nome-vs-resto.
-        riga_label = f"{badge}  ·  **{blocco.esercizio}**  ·  {stato}  {chevron}"
+        # Il dettaglio (schema reps/carico/%1RM/RPE o nome/formato/durata WOD,
+        # fedele al programma importato) va subito dopo il nome - senza,
+        # dalla card collassata non si capisce cosa fare senza aprirla. A capo
+        # esplicito prima di stato/chevron (markdown "  \n", stesso trucco
+        # già usato per log_daynav_card): quando il dettaglio è lungo e va a
+        # capo su più righe da solo, lasciare stato/chevron in coda alla
+        # stessa riga logica li faceva atterrare isolati su una riga propria
+        # comunque - meglio renderlo un a capo intenzionale e leggibile.
+        parte_dettaglio = f"  ·  {dettaglio}" if dettaglio else ""
+        riga_label = f"{badge}  ·  **{blocco.esercizio}**{parte_dettaglio}  \n{stato}  {chevron}"
         if styled_button(riga_label, key=f"{card_key}_row", variant="row", use_container_width=True, wrap=True):
             st.session_state["log_active_block"] = None if show_body else blocco.id
             st.rerun()
